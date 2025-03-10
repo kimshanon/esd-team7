@@ -19,17 +19,16 @@ CREATE TABLE FoodMenu (
   stallID INT,
   foodName VARCHAR(255),
   foodPrice INT,
-  foodImage VARCHAR(255),
   FOREIGN KEY (stallID) REFERENCES FoodStall(stallID)
 );
 
 INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodImage)
 VALUES
-(1, )
+    (1, )
 
 INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodImage)
 VALUES
-(2, 'Plain Waffle', $1.25, )
+    (2, 'Plain Waffle', $1.25, )
 
 
 INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodImage) 
