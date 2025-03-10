@@ -25,4 +25,7 @@ CREATE TABLE FoodMenu (
 
 
 
+INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodDescription) 
+VALUES 
+(4, 'Fries', 6, 'A juicy cheeseburger with fresh lettuce, tomatoes, and cheese.'),
 
