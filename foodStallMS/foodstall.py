@@ -54,6 +54,7 @@ class FoodMenu(db.Model):
         }
 
 @app.route("/")
+
 # Add new stall
 @app.route("/stall", methods=['POST'])
 def add_stall():
