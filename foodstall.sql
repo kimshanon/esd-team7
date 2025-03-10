@@ -32,6 +32,52 @@ VALUES
 
 
 INSERT INTO FoodMenu (stallID, menuName, menuPrice) 
+VALUES
+(3, 'Plain Waffle', 1.0, ''), 
+(3, 'Kaya Waffle', 2.0, ''), 
+(3, 'Butter Waffle', 2.0, ''),
+(3, 'Honey Waffle', 2.0,''),
+(3,'Chocolate Waffle', 2.2, ''), 
+(3, 'Peanbut Butter Waffle', 2.2, ''),
+(3, 'Sliced Cheese Waffle', 2.2, ''), 
+(3, 'Biscoff waffle', 2.8, ''), 
+(3, 'Tater tots', 2.5, ''), 
+(3, 'Kaya Bun', 2.2, ''),
+(3, 'Chocolate Bun', 2.2, ''),
+(3, 'Peanut Butter Bun', 2.2, ''), 
+(3, 'Honey Butter Bun', 2.4, ''), 
+(3, 'Sweet Milk Bun', 2.2, ''), 
+(3, 'Biscoff Bun', 2.8,''), 
+(3, 'Mushroom Vegan Baked Rice Set', 4.4, ''),
+(3, 'Chicken Sausage Baked Rice Set', 5.5, ''),
+(3, 'Chicken Sausage Burger with Egg' 4.4, ''), 
+(3, 'Chicken Sausage Burger with Egg Set', 6.5, ''), 
+(3, 'Kopi-O hot',1.1,''),
+(3, 'Kopi-O ice', 1.3,''),
+(3, 'Kopi hot', 1.3, ''), 
+(3, 'Kopi ice', 1.5, ''), 
+(3, 'Kopi-C hot', 1.5, ''), 
+(3, 'Kopi-C ice', 1.7, ''), 
+(3, 'Teh-O hot', 1.1, ''), 
+(3, 'Teh-O ice', 1.3, ''), 
+(3, 'Teh hot', 1.3, ''), 
+(3, 'Teh ice', 1.5, ''), 
+(3, 'Teh-C hot', 1.5, ''), 
+(3, 'Teh-C ice', 1.7, ''), 
+(3, 'Ice Lemon Tea', 1.5, '')
+(3, 'Original Soy Coffe hot', 3.0, ''), 
+(3, 'Original Soy Coffee ice', 3.2, ''), 
+(3, 'Mocha', 3.0, ''), 
+(3, 'Matcha Latte', 3.0, ''), 
+(3, 'Chocolate drink', 3.0, ''), 
+(3, 'Taiwanese Milk Tea', 3.0, ''), 
+(3, 'Ginger Milk Tea', 3.3, '')
+
+
+
+
+
+INSERT INTO FoodMenu (stallID, menuName, menuPrice) 
 VALUES 
 (4, 'Fries', 6, ''),
 (4, 'Cheese Fries', 8, ''),
@@ -46,6 +92,14 @@ VALUES
 (4, 'Crispy Fish', 14, ''), 
 (4, 'Pulled Pork', 16, ''), 
 (4, 'Wagyu Beef', 18,'')
+(4, 'Grilled Chicken Chop', 13, ''),
+(4, 'Crispy Chicken Cutlet', 13, ''), 
+(4, 'Fish & Chips', 13, ''), 
+(4, 'Pan-Seared Salmon', 18, ''), 
+(4, 'Creamy Salmon Linguine', 15, ''), 
+(4, 'Creamy Meatball Linguine', 15, ''), 
+(4, 'Vongole Linguine', 15, ''),
+(4, 'Mushroom Aglio Olio Linguine', 15, '')
 
 
 
