@@ -85,6 +85,172 @@ class FoodMenu(db.Model):
             "menuPrice": self.menuPrice
         }
 
+@app.route("/stall", methods=['POST'])
+def add_stall():
+    data = request.get_json()
+    stallName = data.get('stallName')
+    stallLocation = data.get('stallLocation')
+
+    if not stallName or not stallLocation:
+        return jsonify(
+            {
+                "code": 400,
+                "message": "Stall name and location are required."
+            }
+        ), 400
+
+    stall = FoodStall(stallName=stallName, stallLocation=stallLocation)
+
+    try:
+        db.session.add(stall)
+        db.session.commit()
+        return jsonify(
+            {
+                "code": 201,
+                "data": stall.json()
+            }
+        ), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(
+            {
+                "code": 500,
+                "message": f"An error occurred while adding the stall: {str(e)}"
+            }
+        ), 500
+
+
+@app.route("/stall/<int:stallID>/menu", methods=['POST'])
+def add_menu_item(stallID):
+    data = request.get_json()
+    menuName = data.get('menuName')
+    menuPrice = data.get('menuPrice')
+
+    if not menuName or not menuPrice:
+        return jsonify(
+            {
+                "code": 400,
+                "message": "Menu name and price are required."
+            }
+        ), 400
+
+    stall = FoodStall.query.get(stallID)
+
+    if not stall:
+        return jsonify(
+            {
+                "code": 404,
+                "message": f"Stall with ID {stallID} not found."
+            }
+        ), 404
+
+    menu_item = FoodMenu(stallID=stallID, menuName=menuName, menuPrice=menuPrice)
+
+    try:
+        db.session.add(menu_item)
+        db.session.commit()
+        return jsonify(
+            {
+                "code": 201,
+                "data": menu_item.json()
+            }
+        ), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(
+            {
+                "code": 500,
+                "message": f"An error occurred while adding the menu item: {str(e)}"
+            }
+        ), 500
+
+
+@app.route("/stall/<int:stallID>/menu/<int:foodId>", methods=['DELETE'])
+def delete_menu_item(stallID, foodId):
+    menu_item = FoodMenu.query.filter_by(stallID=stallID, menuID=foodId).first()
+
+    if not menu_item:
+        return jsonify(
+            {
+                "code": 404,
+                "message": f"Menu item with ID {foodId} not found at stall {stallID}."
+            }
+        ), 404
+
+    try:
+        db.session.delete(menu_item)
+        db.session.commit()
+        return jsonify(
+            {
+                "code": 200,
+                "message": f"Menu item {foodId} has been deleted."
+            }
+        ), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(
+            {
+                "code": 500,
+                "message": f"An error occurred while deleting the menu item: {str(e)}"
+            }
+        ), 500
+
+
+@app.route("/stalls/<int:stallID>/stallLocation", methods=['GET'])
+def get_stall_location(stallID):
+    stall = FoodStall.query.get(stallID)
+    if stall:
+        return jsonify(
+            {
+                "code": 200,
+                "data": {"stallLocation": stall.stallLocation}
+            }
+        ), 200
+    else:
+        return jsonify(
+            {
+                "code": 404,
+                "message": f"Stall with ID {stallID} not found."
+            }
+        ), 404
+
+
+@app.route("/stalls", methods=['GET'])
+def get_all_stalls():
+    stalls = FoodStall.query.all()
+    if stalls:
+        return jsonify(
+            {
+                "code": 200,
+                "data": [stall.json() for stall in stalls]
+            }
+        ), 200
+    else:
+        return jsonify(
+            {
+                "code": 404,
+                "message": "No stalls found."
+            }
+        ), 404
+
+
+@app.route("/stalls/<int:stallID>/menu", methods=['GET'])
+def get_stall_menu(stallID):
+    stall = FoodStall.query.get(stallID)
+    if stall:
+        return jsonify(
+            {
+                "code": 200,
+                "data": [menu.json() for menu in stall.menus]
+            }
+        ), 200
+    else:
+        return jsonify(
+            {
+                "code": 404,
+                "message": f"Stall with ID {stallID} not found."
+            }
+        ), 404
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
