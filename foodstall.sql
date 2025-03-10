@@ -1,3 +1,6 @@
+CREATE DATABASE FoodStallsDB;
+USE FoodStallsDB;
+
 CREATE TABLE FoodStall (
     stallID INT PRIMARY KEY AUTO_INCREMENT,
     stallName VARCHAR(255) NOT NULL,
