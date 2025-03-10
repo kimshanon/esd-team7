@@ -23,11 +23,8 @@ CREATE TABLE FoodMenu (
   FOREIGN KEY (stallID) REFERENCES FoodStall(stallID)
 );
 
-INSERT INTO
 
 
 
-INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodDescription) 
-VALUES 
-(4, 'Fries', 6, 'A juicy cheeseburger with fresh lettuce, tomatoes, and cheese.'),
+
 
