@@ -15,13 +15,21 @@ VALUES
   ('Canteen Bistro', '80 Stamford Road #B1-61 School of Computing and Information Systems Building, Singapore 178902');
 
 CREATE TABLE FoodMenu (
-  foodID INT AUTO_INCREMENT PRIMARY KEY,
+  menuID INT AUTO_INCREMENT PRIMARY KEY,
   stallID INT,
   foodName VARCHAR(255),
   foodPrice INT,
   foodImage VARCHAR(255),
   FOREIGN KEY (stallID) REFERENCES FoodStall(stallID)
 );
+
+INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodImage)
+VALUES
+(1, )
+
+INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodImage)
+VALUES
+(2, 'Plain Waffle', $1.25, )
 
 
 INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodImage) 
