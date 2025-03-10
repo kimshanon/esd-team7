@@ -1,4 +1,4 @@
-from flask import Flask, requests, jsonify
+from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -53,6 +53,7 @@ class FoodMenu(db.Model):
             "menuPrice": self.menuPrice
         }
 
+@app.route("/")
 # Add new stall
 @app.route("/stall", methods=['POST'])
 def add_stall():
