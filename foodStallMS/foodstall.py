@@ -260,23 +260,6 @@ def get_stall(stallID):
     stall = FoodStall.query.get(stallID)
     return jsonify({"code": 200, "data": stall.json()}), 200 if stall else ({"code": 404, "message": f"Stall {stallID} not found."}, 404)
 
-
-@app.route("/stall/<int:stallID>", methods=['PUT'])
-def update_stall(stallID):
-    stall = FoodStall.query.get(stallID)
-    if not stall:
-        return jsonify({"code": 404, "message": f"Stall {stallID} not found."}), 404
-
-    data = request.get_json()
-    stall.stallName = data.get('stallName', stall.stallName)
-    stall.stallLocation = data.get('stallLocation', stall.stallLocation)
-
-    try:
-        db.session.commit()
-        return jsonify({"code": 200, "data": stall.json()}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"code": 500, "message": str(e)}), 500
     
 
 @app.route("/stall/<int:stallID>/menu/<int:foodId>", methods=['PUT'])
@@ -299,4 +282,16 @@ def update_menu_item(stallID, foodId):
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
 
-    
+@app.route("/prepareorder/<int:orderID>", methods=['PUT'])
+def prepare_order(orderID):
+    order = Order.query.get(orderID)
+    if not order:
+        return jsonify({"code": 404, "message": f"Order {orderID} not found."}), 404
+
+    order.status = "Preparing"
+    try:
+        db.session.commit()
+        return jsonify({"code": 200, "message": f"Order {orderID} is now being prepared."}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"code": 500, "message": str(e)}), 500
