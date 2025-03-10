@@ -45,8 +45,7 @@ class FoodStall(db.Model):
     stallID = db.Column(db.Integer, primary_key=True, autoincrement=True)
     stallName = db.Column(db.String(255), nullable=False)
     stallLocation = db.Column(db.String(255), nullable=False)
-
-    # One to many relationship with FoodMenu
+    
     menus = db.relationship('FoodMenu', back_populates='stall')
 
     def __init__(self, stallName, stallLocation):
@@ -252,9 +251,6 @@ def get_stall_menu(stallID):
             }
         ), 404
 
-if __name__ == '__main__':
-    app.run(port=5000, debug=True)
-
 @app.route("/stall/<int:stallID>", methods=['GET'])
 def get_stall(stallID):
     stall = FoodStall.query.get(stallID)
@@ -279,9 +275,6 @@ def update_menu_item(stallID, foodId):
         db.session.rollback()
         return jsonify({"code": 500, "message": str(e)}), 500
 
-if __name__ == '__main__':
-    app.run(port=5000, debug=True)
-
 @app.route("/prepareorder/<int:orderID>", methods=['PUT'])
 def prepare_order(orderID):
     order = Order.query.get(orderID)
@@ -295,3 +288,6 @@ def prepare_order(orderID):
     except Exception as e:
         db.session.rollback()
         return jsonify({"code": 500, "message": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(port=5000, debug=True)
