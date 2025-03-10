@@ -17,21 +17,21 @@ VALUES
 CREATE TABLE FoodMenu (
   menuID INT AUTO_INCREMENT PRIMARY KEY,
   stallID INT,
-  foodName VARCHAR(255),
-  foodPrice INT,
+  menuName VARCHAR(255),
+  menuPrice INT,
   FOREIGN KEY (stallID) REFERENCES FoodStall(stallID)
 );
 
-INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodImage)
+INSERT INTO FoodMenu (stallID, menuName, menuPrice)
 VALUES
     (1, )
 
-INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodImage)
+INSERT INTO FoodMenu (stallID, menuName, menuPrice)
 VALUES
     (2, 'Plain Waffle', $1.25, )
 
 
-INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodImage) 
+INSERT INTO FoodMenu (stallID, menuName, menuPrice) 
 VALUES 
 (4, 'Fries', 6, ''),
 (4, 'Cheese Fries', 8, ''),
