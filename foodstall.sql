@@ -36,6 +36,16 @@ VALUES
 (4, 'Fries', 6, ''),
 (4, 'Cheese Fries', 8, ''),
 (4, 'Truffle Fries', 12, ''),
+(4, 'Pulled Pork Fries', 12, ''),
+(4, 'Vongole', 12, ''),
+(4, 'Fried Chicken Wings', 15, ''),
+(4, 'Fried Caalamari', 15, ''), 
+(4, 'Tempura Prawns', 15, ''), 
+(4, 'Combo Platter', 26, ''), 
+(4, 'Crispy Chicken', 14, ''), 
+(4, 'Crispy Fish', 14, ''), 
+(4, 'Pulled Pork', 16, ''), 
+(4, 'Wagyu Beef', 18,'')
 
 
 
