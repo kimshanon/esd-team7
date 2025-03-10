@@ -70,7 +70,6 @@ class FoodMenu(db.Model):
     menuName = db.Column(db.String(255), nullable=False)
     menuPrice = db.Column(db.Float, nullable=False)
 
-    # Relationship to FoodStall
     stall = db.relationship('FoodStall', back_populates='menus')
 
     def __init__(self, stallID, menuName, menuPrice):
@@ -86,3 +85,6 @@ class FoodMenu(db.Model):
             "menuPrice": self.menuPrice
         }
 
+
+if __name__ == '__main__':
+    app.run(port=5000, debug=True)
