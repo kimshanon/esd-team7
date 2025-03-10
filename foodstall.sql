@@ -24,7 +24,11 @@ CREATE TABLE FoodMenu (
 );
 
 
-
+INSERT INTO FoodMenu (stallID, foodName, foodPrice, foodImage) 
+VALUES 
+(4, 'Fries', 6, ''),
+(4, 'Cheese Fries', 8, ''),
+(4, 'Truffle Fries', 12, ''),
 
 
 
