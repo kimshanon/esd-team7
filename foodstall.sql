@@ -19,9 +19,11 @@ CREATE TABLE FoodMenu (
   stallID INT,
   foodName VARCHAR(255),
   foodPrice INT,
-  foodDescription VARCHAR(255),
+  foodImage VARCHAR(255),
   FOREIGN KEY (stallID) REFERENCES FoodStall(stallID)
 );
+
+INSERT INTO
 
 
 
