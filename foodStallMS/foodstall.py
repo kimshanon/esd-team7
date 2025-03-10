@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, requests, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -9,10 +9,6 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_recycle': 299}
 
 db = SQLAlchemy(app)
 
-from flask_sqlalchemy import SQLAlchemy
-
-db = SQLAlchemy()
-
 class FoodStall(db.Model):
     __tablename__ = 'FoodStall'
 
@@ -33,33 +29,6 @@ class FoodStall(db.Model):
             "stallLocation": self.stallLocation,
             "menus": [menu.json() for menu in self.menus]
         }
-
-
-from flask_sqlalchemy import SQLAlchemy
-
-db = SQLAlchemy()
-
-class FoodStall(db.Model):
-    __tablename__ = 'FoodStall'
-
-    stallID = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    stallName = db.Column(db.String(255), nullable=False)
-    stallLocation = db.Column(db.String(255), nullable=False)
-    
-    menus = db.relationship('FoodMenu', back_populates='stall')
-
-    def __init__(self, stallName, stallLocation):
-        self.stallName = stallName
-        self.stallLocation = stallLocation
-
-    def json(self):
-        return {
-            "stallID": self.stallID,
-            "stallName": self.stallName,
-            "stallLocation": self.stallLocation,
-            "menus": [menu.json() for menu in self.menus]
-        }
-
 
 class FoodMenu(db.Model):
     __tablename__ = 'FoodMenu'
@@ -84,6 +53,7 @@ class FoodMenu(db.Model):
             "menuPrice": self.menuPrice
         }
 
+# Add new stall
 @app.route("/stall", methods=['POST'])
 def add_stall():
     data = request.get_json()
@@ -118,7 +88,7 @@ def add_stall():
             }
         ), 500
 
-
+# Add new item to the menu
 @app.route("/stall/<int:stallID>/menu", methods=['POST'])
 def add_menu_item(stallID):
     data = request.get_json()
@@ -163,16 +133,16 @@ def add_menu_item(stallID):
             }
         ), 500
 
-
-@app.route("/stall/<int:stallID>/menu/<int:foodId>", methods=['DELETE'])
-def delete_menu_item(stallID, foodId):
-    menu_item = FoodMenu.query.filter_by(stallID=stallID, menuID=foodId).first()
+# Delete item of the menu from specific stall
+@app.route("/stall/<int:stallID>/menu/<int:menuID>", methods=['DELETE'])
+def delete_menu_item(stallID, menuID):
+    menu_item = FoodMenu.query.filter_by(stallID=stallID, menuID=menuID).first()
 
     if not menu_item:
         return jsonify(
             {
                 "code": 404,
-                "message": f"Menu item with ID {foodId} not found at stall {stallID}."
+                "message": f"Menu item with ID {menuID} not found at stall {stallID}."
             }
         ), 404
 
@@ -182,7 +152,7 @@ def delete_menu_item(stallID, foodId):
         return jsonify(
             {
                 "code": 200,
-                "message": f"Menu item {foodId} has been deleted."
+                "message": f"Menu item {menuID} has been deleted."
             }
         ), 200
     except Exception as e:
@@ -194,7 +164,7 @@ def delete_menu_item(stallID, foodId):
             }
         ), 500
 
-
+# Get stall location
 @app.route("/stalls/<int:stallID>/stallLocation", methods=['GET'])
 def get_stall_location(stallID):
     stall = FoodStall.query.get(stallID)
@@ -213,7 +183,7 @@ def get_stall_location(stallID):
             }
         ), 404
 
-
+# Get all stalls
 @app.route("/stalls", methods=['GET'])
 def get_all_stalls():
     stalls = FoodStall.query.all()
@@ -232,7 +202,7 @@ def get_all_stalls():
             }
         ), 404
 
-
+# Get specific menu from specific stall
 @app.route("/stalls/<int:stallID>/menu", methods=['GET'])
 def get_stall_menu(stallID):
     stall = FoodStall.query.get(stallID)
@@ -251,18 +221,18 @@ def get_stall_menu(stallID):
             }
         ), 404
 
+# Get details of specific stall
 @app.route("/stall/<int:stallID>", methods=['GET'])
 def get_stall(stallID):
     stall = FoodStall.query.get(stallID)
     return jsonify({"code": 200, "data": stall.json()}), 200 if stall else ({"code": 404, "message": f"Stall {stallID} not found."}, 404)
 
-    
-
-@app.route("/stall/<int:stallID>/menu/<int:foodId>", methods=['PUT'])
-def update_menu_item(stallID, foodId):
-    menu_item = FoodMenu.query.filter_by(stallID=stallID, menuID=foodId).first()
+# Update specific menu details
+@app.route("/stall/<int:stallID>/menu/<int:menuID>", methods=['PUT'])
+def update_menu_item(stallID, menuID):
+    menu_item = FoodMenu.query.filter_by(stallID=stallID, menuID=menuID).first()
     if not menu_item:
-        return jsonify({"code": 404, "message": f"Menu item {foodId} not found."}), 404
+        return jsonify({"code": 404, "message": f"Menu item {menuID} not found."}), 404
 
     data = request.get_json()
     menu_item.menuName = data.get('menuName', menu_item.menuName)
@@ -275,18 +245,32 @@ def update_menu_item(stallID, foodId):
         db.session.rollback()
         return jsonify({"code": 500, "message": str(e)}), 500
 
+
 @app.route("/prepareorder/<int:orderID>", methods=['PUT'])
 def prepare_order(orderID):
-    order = Order.query.get(orderID)
-    if not order:
-        return jsonify({"code": 404, "message": f"Order {orderID} not found."}), 404
+    
+    # This will be replaced with the Docker container link later
+    order_microservice_url = f"http://order_microservice_url/orders/{orderID}"
 
-    order.status = "Preparing"
     try:
-        db.session.commit()
-        return jsonify({"code": 200, "message": f"Order {orderID} is now being prepared."}), 200
-    except Exception as e:
-        db.session.rollback()
+        response = requests.get(order_microservice_url)
+        
+        if response.status_code == 404:
+            return jsonify({"code": 404, "message": f"Order {orderID} not found."}), 404
+        
+        order_data = response.json()
+
+        order_data["status"] = "Preparing"
+
+        # THIS ONE NOT YET UPDATED YA GUYS!!!!!!!!!!
+        update_response = requests.put(order_microservice_url, json=order_data)
+
+        if update_response.status_code == 200:
+            return jsonify({"code": 200, "message": f"Order {orderID} is now being prepared."}), 200
+        else:
+            return jsonify({"code": 500, "message": "Failed to update order status."}), 500
+
+    except requests.exceptions.RequestException as e:
         return jsonify({"code": 500, "message": str(e)}), 500
 
 if __name__ == '__main__':
