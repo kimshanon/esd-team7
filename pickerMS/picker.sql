@@ -4,18 +4,28 @@ DROP TABLE IF EXISTS picker;
 
 -- Create picker table
 CREATE TABLE picker (
-    pickerID INTEGER PRIMARY KEY AUTOINCREMENT,
+    pickerID INTEGER PRIMARY KEY AUTO_INCREMENT,
     pickerName VARCHAR(100) NOT NULL,
     pickerPhone VARCHAR(20) NOT NULL
 );
 
 -- Create orders table for order confirmation
 CREATE TABLE orders (
-    orderID INTEGER PRIMARY KEY,
-    status VARCHAR(20) DEFAULT 'pending' NOT NULL,
-    pickerID INTEGER,
-    confirmationTimestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (pickerID) REFERENCES picker(pickerID)
+    orderID INTEGER PRIMARY KEY AUTO_INCREMENT,
+    customerID INTEGER NOT NULL,
+    pickerID INTEGER,  
+    stallID INTEGER NOT NULL,  
+    additionalRequests VARCHAR(255),  
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
+    location VARCHAR(255) NOT NULL,
+    credit INT DEFAULT 0,  
+    payment INT NOT NULL,  
+    status VARCHAR(20) DEFAULT 'pending' NOT NULL,  
+    
+    -- Foreign Key Constraints
+    FOREIGN KEY (pickerID) REFERENCES picker(pickerID),
+    FOREIGN KEY (customerID) REFERENCES customer(customerID),
+    FOREIGN KEY (stallID) REFERENCES stall(stallID)
 );
 
 -- Create indices for better query performance
