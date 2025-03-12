@@ -12,7 +12,7 @@ db = SQLAlchemy(app)
 class FoodStall(db.Model):
     __tablename__ = 'FoodStall'
 
-    stallID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    stall_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     stallName = db.Column(db.String(255), nullable=False)
     stallLocation = db.Column(db.String(255), nullable=False)
 
@@ -204,7 +204,7 @@ def get_all_stalls():
             }
         ), 404
 
-# Get specific menu from specific stall
+# Get menu from specific stall
 @app.route("/stalls/<int:stallID>/menu", methods=['GET'])
 def get_stall_menu(stallID):
     stall = FoodStall.query.get(stallID)
@@ -246,6 +246,16 @@ def update_menu_item(stallID, menuID):
     except Exception as e:
         db.session.rollback()
         return jsonify({"code": 500, "message": str(e)}), 500
+
+# Get menu item
+@app.route("/stall/<int:stallID>/menu/<int:menuID>", methods=['GET'])
+def get_menu_item(stallID, menuID):
+    menu_item = FoodMenu.query.filter_by(stallID=stallID, menuID=menuID).first()
+
+    if menu_item:
+        return jsonify({"code": 200, "data": menu_item.json()}), 200
+    else:
+        return jsonify({"code": 404, "message": f"Menu item {menuID} not found in stall {stallID}."}), 404
 
 
 @app.route("/prepareorder/<int:orderID>", methods=['PUT'])
