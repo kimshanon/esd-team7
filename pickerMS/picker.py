@@ -1,212 +1,302 @@
 from flask import Flask, request, jsonify
-import sqlite3
-from flask_cors import CORS
-import logging
-import os
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] - %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-logger = logging.getLogger(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:root@localhost:3306/PickerDB'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_recycle': 299}
 
-# Database setup
-DB_PATH = 'picker_db.sqlite'
+db = SQLAlchemy(app)
 
-def get_db_connection():
-    """Create a database connection and return connection and cursor."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # This enables column access by name
-    return conn
+class Picker(db.Model):
+    __tablename__ = 'Picker'
 
-def init_db():
-    """Initialize the database with the required tables."""
-    try:
-        conn = get_db_connection()
-        with open('picker.sql') as f:
-            conn.executescript(f.read())
-        conn.commit()
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        logger.error(f"Database initialization error: {str(e)}")
-    finally:
-        if conn:
-            conn.close()
+    pickerID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    pickerName = db.Column(db.String(100), nullable=False)
+    pickerPhone = db.Column(db.String(20), nullable=False)
+    pickerStatus = db.Column(db.String(50), nullable=False, default='Available')
 
-# Initialize database on startup
-if not os.path.exists(DB_PATH):
-    init_db()
+    def __init__(self, pickerName, pickerPhone, pickerStatus='Available'):
+        self.pickerName = pickerName
+        self.pickerPhone = pickerPhone
+        self.pickerStatus = pickerStatus
 
-@app.route('/pickers/<int:pickerID>', methods=['GET'])
-def get_picker(pickerID):
-    """Get picker details by pickerID."""
-    try:
-        conn = get_db_connection()
-        picker = conn.execute("SELECT * FROM picker WHERE pickerID = ?", (pickerID,)).fetchone()
-        
-        if not picker:
-            return jsonify({"error": "Picker not found"}), 404
-        
-        # Convert to dictionary
-        picker_data = {
-            "pickerID": picker['pickerID'],
-            "pickerName": picker['pickerName'],
-            "pickerPhone": picker['pickerPhone']
+    def json(self):
+        return {
+            "pickerID": self.pickerID,
+            "pickerName": self.pickerName,
+            "pickerPhone": self.pickerPhone,
+            "pickerStatus": self.pickerStatus
         }
-        
-        return jsonify(picker_data), 200
-    except Exception as e:
-        logger.error(f"Error retrieving picker: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-    finally:
-        if conn:
-            conn.close()
 
-@app.route('/confirmorder/<int:orderID>', methods=['PUT'])
-def confirm_order(orderID):
-    """Confirm an order by updating its status."""
-    try:
-        data = request.json
-        pickerID = data.get('pickerID')
-        
-        # Validate request data
-        if not pickerID:
-            return jsonify({"error": "pickerID is required"}), 400
-        
-        conn = get_db_connection()
-        
-        # Check if picker exists
-        picker_exists = conn.execute("SELECT 1 FROM picker WHERE pickerID = ?", (pickerID,)).fetchone()
-        if not picker_exists:
-            return jsonify({"error": "Picker not found"}), 404
-        
-        # Check if order exists
-        order_exists = conn.execute("SELECT 1 FROM orders WHERE orderID = ?", (orderID,)).fetchone()
-        
-        if order_exists:
-            # Update existing order
-            conn.execute(
-                "UPDATE orders SET status = 'confirmed', pickerID = ?, confirmationTimestamp = CURRENT_TIMESTAMP WHERE orderID = ?", 
-                (pickerID, orderID)
-            )
-        else:
-            # Create new order
-            conn.execute(
-                "INSERT INTO orders (orderID, status, pickerID, confirmationTimestamp) VALUES (?, 'confirmed', ?, CURRENT_TIMESTAMP)",
-                (orderID, pickerID)
-            )
-        
-        conn.commit()
-        
-        return jsonify({
-            "message": f"Order {orderID} confirmed successfully",
-            "orderID": orderID,
-            "pickerID": pickerID,
-            "status": "confirmed"
-        }), 200
-    except Exception as e:
-        logger.error(f"Error confirming order: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-    finally:
-        if conn:
-            conn.close()
+@app.route("/")
+def home():
+    return "Picker Microservice"
 
-@app.route('/picker', methods=['POST'])
-def add_picker():
-    """Add a new picker to the system."""
-    try:
-        data = request.json
-        
-        # Validate required fields
-        required_fields = ['pickerName', 'pickerPhone']
-        for field in required_fields:
-            if field not in data or not data[field]:
-                return jsonify({"error": f"Missing required field: {field}"}), 400
-        
-        pickerName = data['pickerName']
-        pickerPhone = data['pickerPhone']
-        
-        conn = get_db_connection()
-        
-        # Insert new picker
-        cursor = conn.execute(
-            "INSERT INTO picker (pickerName, pickerPhone) VALUES (?, ?)",
-            (pickerName, pickerPhone)
-        )
-        
-        conn.commit()
-        
-        # Return the newly created picker with its ID
-        new_pickerID = cursor.lastrowid
-        
-        return jsonify({
-            "message": "Picker added successfully",
-            "picker": {
-                "pickerID": new_pickerID,
-                "pickerName": pickerName,
-                "pickerPhone": pickerPhone
-            }
-        }), 201
-    except Exception as e:
-        logger.error(f"Error adding picker: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-    finally:
-        if conn:
-            conn.close()
-
-# Additional helper endpoints
-
-@app.route('/pickers', methods=['GET'])
+# Get all pickers
+@app.route("/pickers", methods=['GET'])
 def get_all_pickers():
-    """Get all pickers in the system."""
-    try:
-        conn = get_db_connection()
-        pickers = conn.execute("SELECT * FROM picker").fetchall()
-        
-        result = []
-        for picker in pickers:
-            result.append({
-                "pickerID": picker['pickerID'],
-                "pickerName": picker['pickerName'],
-                "pickerPhone": picker['pickerPhone']
-            })
-        
-        return jsonify(result), 200
-    except Exception as e:
-        logger.error(f"Error retrieving pickers: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-    finally:
-        if conn:
-            conn.close()
+    pickers = Picker.query.all()
+    if pickers:
+        return jsonify(
+            {
+                "code": 200,
+                "data": [picker.json() for picker in pickers]
+            }
+        ), 200
+    else:
+        return jsonify(
+            {
+                "code": 404,
+                "message": "No pickers found."
+            }
+        ), 404
 
-@app.route('/picker/<int:pickerID>', methods=['DELETE'])
-def delete_picker(pickerID):
-    """Delete a picker by ID."""
+# Get specific picker
+@app.route("/pickers/<int:pickerID>", methods=['GET'])
+def get_picker(pickerID):
+    picker = Picker.query.get(pickerID)
+    return jsonify({"code": 200, "data": picker.json()}), 200 if picker else (
+        {"code": 404, "message": f"Picker {pickerID} not found."}, 404)
+
+# Add new picker
+@app.route("/picker", methods=['POST'])
+def add_picker():
+    data = request.get_json()
+    pickerName = data.get('pickerName')
+    pickerPhone = data.get('pickerPhone')
+    pickerStatus = data.get('pickerStatus', 'Available')  # Default status if not provided
+
+    if not pickerName or not pickerPhone:
+        return jsonify(
+            {
+                "code": 400,
+                "message": "Picker name and phone are required."
+            }
+        ), 400
+
+    picker = Picker(pickerName=pickerName, pickerPhone=pickerPhone, pickerStatus=pickerStatus)
+
     try:
-        conn = get_db_connection()
-        
-        # Check if picker exists
-        picker_exists = conn.execute("SELECT 1 FROM picker WHERE pickerID = ?", (pickerID,)).fetchone()
-        if not picker_exists:
-            return jsonify({"error": "Picker not found"}), 404
-        
-        # Delete the picker
-        conn.execute("DELETE FROM picker WHERE pickerID = ?", (pickerID,))
-        conn.commit()
-        
-        return jsonify({"message": f"Picker {pickerID} deleted successfully"}), 200
+        db.session.add(picker)
+        db.session.commit()
+        return jsonify(
+            {
+                "code": 201,
+                "data": picker.json()
+            }
+        ), 201
     except Exception as e:
-        logger.error(f"Error deleting picker: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-    finally:
-        if conn:
-            conn.close()
+        db.session.rollback()
+        return jsonify(
+            {
+                "code": 500,
+                "message": f"An error occurred while adding the picker: {str(e)}"
+            }
+        ), 500
+
+# Update picker status to available after pciker cancels
+@app.route("/picker/<int:pickerID>/status", methods=['PUT'])
+def update_picker_status(pickerID):
+    picker = Picker.query.get(pickerID)
+    if not picker:
+        return jsonify(
+            {
+                "code": 404,
+                "message": f"Picker with ID {pickerID} not found."
+            }
+        ), 404
+
+    data = request.get_json()
+    new_status = data.get('pickerStatus')
+    
+    if not new_status:
+        return jsonify(
+            {
+                "code": 400,
+                "message": "Picker status is required."
+            }
+        ), 400
+    
+    try:
+        picker.pickerStatus = new_status
+        db.session.commit()
+        return jsonify(
+            {
+                "code": 200,
+                "message": f"Picker {pickerID} status updated to {new_status}.",
+                "data": picker.json()
+            }
+        ), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(
+            {
+                "code": 500,
+                "message": f"An error occurred while updating the picker status: {str(e)}"
+            }
+        ), 500
+
+# Confirm an order -- not confirmed cos this requires order microservice which i do not have in the database right now
+# @app.route("/confirmorder/<int:orderID>", methods=['PUT'])
+# def confirm_order(orderID):
+#     data = request.get_json()
+#     pickerID = data.get('pickerID')
+    
+#     if not pickerID:
+#         return jsonify(
+#             {
+#                 "code": 400,
+#                 "message": "Picker ID is required."
+#             }
+#         ), 400
+    
+#     # Check if picker exists
+#     picker = Picker.query.get(pickerID)
+#     if not picker:
+#         return jsonify(
+#             {
+#                 "code": 404,
+#                 "message": f"Picker with ID {pickerID} not found."
+#             }
+#         ), 404
+    
+#     # Check if picker is available
+#     if picker.pickerStatus != 'Available':
+#         return jsonify(
+#             {
+#                 "code": 400,
+#                 "message": f"Picker {pickerID} is not available. Current status: {picker.pickerStatus}"
+#             }
+#         ), 400
+    
+#     # In a microservice architecture, we'd communicate with the Order service
+#     # to update the order status. Here's a placeholder for that logic:
+#     try:
+#         # This would be replaced with actual service communication
+#         # e.g., using requests to call the Order microservice API
+        
+#         # Update picker status to Busy since they're now handling an order
+#         picker.pickerStatus = 'Busy'
+#         db.session.commit()
+        
+#         # Placeholder for successful response
+#         return jsonify(
+#             {
+#                 "code": 200,
+#                 "message": f"Order {orderID} confirmed successfully with picker {pickerID}.",
+#                 "data": {
+#                     "orderID": orderID,
+#                     "pickerID": pickerID,
+#                     "pickerStatus": picker.pickerStatus,
+#                     "status": "confirmed"
+#                 }
+#             }
+#         ), 200
+#     except Exception as e:
+#         db.session.rollback()
+#         return jsonify(
+#             {
+#                 "code": 500,
+#                 "message": f"An error occurred while confirming the order: {str(e)}"
+#             }
+#         ), 500
+
+# Delete a picker
+@app.route("/picker/<int:pickerID>", methods=['DELETE'])
+def delete_picker(pickerID):
+    picker = Picker.query.get(pickerID)
+    if not picker:
+        return jsonify(
+            {
+                "code": 404,
+                "message": f"Picker with ID {pickerID} not found."
+            }
+        ), 404
+
+    try:
+        db.session.delete(picker)
+        db.session.commit()
+        return jsonify(
+            {
+                "code": 200,
+                "message": f"Picker {pickerID} has been deleted."
+            }
+        ), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(
+            {
+                "code": 500,
+                "message": f"An error occurred while deleting the picker: {str(e)}"
+            }
+        ), 500
+
+# Update a picker (full update)
+@app.route("/picker/<int:pickerID>", methods=['PUT'])
+def update_picker(pickerID):
+    picker = Picker.query.get(pickerID)
+    if not picker:
+        return jsonify(
+            {
+                "code": 404,
+                "message": f"Picker with ID {pickerID} not found."
+            }
+        ), 404
+
+    data = request.get_json()
+    pickerName = data.get('pickerName')
+    pickerPhone = data.get('pickerPhone')
+    pickerStatus = data.get('pickerStatus')
+
+    if not pickerName or not pickerPhone or not pickerStatus:
+        return jsonify(
+            {
+                "code": 400,
+                "message": "Picker name, phone, and status are all required for a full update."
+            }
+        ), 400
+
+    try:
+        picker.pickerName = pickerName
+        picker.pickerPhone = pickerPhone
+        picker.pickerStatus = pickerStatus
+        db.session.commit()
+        return jsonify(
+            {
+                "code": 200,
+                "message": f"Picker {pickerID} has been updated.",
+                "data": picker.json()
+            }
+        ), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(
+            {
+                "code": 500,
+                "message": f"An error occurred while updating the picker: {str(e)}"
+            }
+        ), 500
+
+# Get available pickers after picker cancels?
+@app.route("/pickers/available", methods=['GET'])
+def get_available_pickers():
+    pickers = Picker.query.filter_by(pickerStatus='Available').all()
+    if pickers:
+        return jsonify(
+            {
+                "code": 200,
+                "data": [picker.json() for picker in pickers]
+            }
+        ), 200
+    else:
+        return jsonify(
+            {
+                "code": 404,
+                "message": "No available pickers found."
+            }
+        ), 404
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(port=5001, debug=True)
