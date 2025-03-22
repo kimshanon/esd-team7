@@ -16,7 +16,7 @@ db = firestore.client()
 def home():
     return "Picker Microservice (Using Firebase Firestore)"
 
-# Get all pickers
+# Get all pickers WORKS
 @app.route("/pickers", methods=['GET'])
 def get_all_pickers():
     pickers_ref = db.collection('pickers')
@@ -28,7 +28,7 @@ def get_all_pickers():
     else:
         return jsonify({"code": 404, "message": "No pickers found."}), 404
 
-# Add a bulk list of pickers (NEW ROUTE)
+# Add a bulk list of pickers (NEW ROUTE) WORKS
 @app.route("/pickers/add_bulk", methods=['POST'])
 def add_bulk_pickers():
     pickers = [
@@ -46,7 +46,9 @@ def add_bulk_pickers():
 
     return jsonify({"code": 201, "message": "Pickers added successfully!"}), 201
 
-# Get specific picker
+
+
+# Get specific picker WORKS
 @app.route("/pickers/<pickerID>", methods=['GET'])
 def get_picker(pickerID):
     picker_ref = db.collection('pickers').document(pickerID)
@@ -57,8 +59,10 @@ def get_picker(pickerID):
     else:
         return jsonify({"code": 404, "message": f"Picker {pickerID} not found."}), 404
 
-# Add a new picker
-@app.route("/picker", methods=['POST'])
+
+
+# Add a new picker WORKS
+@app.route("/pickers", methods=['POST'])
 def add_picker():
     data = request.get_json()
     picker_ref = db.collection('pickers').document()  # Auto-generate ID
@@ -66,8 +70,10 @@ def add_picker():
 
     return jsonify({"code": 201, "data": data}), 201
 
+
+
 # Update picker status
-@app.route("/picker/<pickerID>/status", methods=['PUT'])
+@app.route("/pickers/<pickerID>/status", methods=['PUT'])
 def update_picker_status(pickerID):
     data = request.get_json()
     new_status = data.get('pickerStatus')
@@ -80,15 +86,19 @@ def update_picker_status(pickerID):
 
     return jsonify({"code": 200, "message": f"Picker {pickerID} status updated to {new_status}."}), 200
 
+
+
 # Delete a picker
-@app.route("/picker/<pickerID>", methods=['DELETE'])
+@app.route("/pickers/<pickerID>", methods=['DELETE'])
 def delete_picker(pickerID):
     picker_ref = db.collection('pickers').document(pickerID)
     picker_ref.delete()
 
     return jsonify({"code": 200, "message": f"Picker {pickerID} has been deleted."}), 200
 
-# Get available pickers
+
+
+# Get available pickers WORKS 
 @app.route("/pickers/available", methods=['GET'])
 def get_available_pickers():
     pickers_ref = db.collection('pickers').where("pickerStatus", "==", "Available")
