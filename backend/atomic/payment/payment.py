@@ -87,5 +87,18 @@ def create_payment():
     
     return jsonify({"code": 201, "data": data}), 201
 
+# Delete a payment
+@app.route("/payments/<paymentID>", methods=['DELETE'])
+def delete_payment(paymentID):
+    payment_ref = db.collection('payments').document(paymentID)
+    payment = payment_ref.get()
+
+    if not payment.exists:
+        return jsonify({"code": 404, "message": f"Payment {paymentID} not found."}), 404
+
+    payment_ref.delete()
+    return jsonify({"code": 200, "message": f"Payment {paymentID} has been deleted."}), 200
+
+
 if __name__ == '__main__':
     app.run(port=5001, debug=True)
