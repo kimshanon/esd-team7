@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusEats - Current Order</title>
+    <style>
+        /* Basic Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        /* Header Styles */
+        header {
+            background-color: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .logo {
+            font-weight: bold;
+            font-size: 1.5rem;
+            color: #4f46e5;
+        }
+
+        .user-icon {
+            width: 32px;
+            height: 32px;
+            background-color: #4f46e5;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        /* Main Content */
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+
+        /* Order Card */
+        .order-card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .order-header {
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .restaurant-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .order-id {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: capitalize;
+        }
+
+        .status-preparing {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+
+        .order-content {
+            padding: 15px;
+        }
+
+        .order-info {
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .order-footer {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 15px;
+            background-color: #f9fafb;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .total-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .total-price {
+            font-weight: bold;
+        }
+
+        .no-orders {
+            text-align: center;
+            padding: 40px 0;
+            color: #666;
+        }
+
+        /* Cancel Button */
+        .cancel-button {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        .cancel-button:hover {
+            background-color: #fecaca;
+        }
+
+        /* Confirmation Dialog */
+        .dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            display: none;
+        }
+
+        .dialog {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .dialog-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .dialog-content {
+            margin-bottom: 20px;
+        }
+
+        .dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .dialog-button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .dialog-button-cancel {
+            background-color: #f3f4f6;
+            border: 1px solid #d1d5db;
+        }
+
+        .dialog-button-confirm {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+
+        /* Order cancelled message */
+        .order-cancelled-message {
+            background-color: #f3f4f6;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .order-cancelled-message h2 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #6b7280;
+        }
+
+        .order-cancelled-message p {
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">CampusEats</div>
+        <div class="user-icon">JD</div>
+    </header>
+
+    <div class="container">
+        <h1>Your Current Order</h1>
+
+        <div id="order-container">
+            <div class="order-card" id="current-order">
+                <div class="order-header">
+                    <div>
+                        <div class="restaurant-name">Campus Burger</div>
+                        <div class="order-id">Order #ord-001</div>
+                    </div>
+                    <span class="status-badge status-preparing">Preparing</span>
+                </div>
+                <div class="order-content">
+                    <div class="order-info">
+                        <strong>Items:</strong> Double Cheeseburger, Fries, Soda
+                    </div>
+                    <div class="order-info">
+                        <strong>Ordered at:</strong> 12:15 PM
+                    </div>
+                    <div class="order-info">
+                        <strong>Estimated delivery:</strong> 12:45 PM
+                    </div>
+                    <button class="cancel-button" id="cancel-button">Cancel Order</button>
+                </div>
+                <div class="order-footer">
+                    <span class="total-label">Total</span>
+                    <span class="total-price">$12.99</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="order-cancelled-message" id="cancelled-message">
+            <h2>Order Cancelled</h2>
+            <p>Your order has been successfully cancelled.</p>
+        </div>
+    </div>
+
+    <!-- Confirmation Dialog -->
+    <div class="dialog-overlay" id="cancel-dialog">
+        <div class="dialog">
+            <div class="dialog-title">Cancel Order</div>
+            <div class="dialog-content">
+                Are you sure you want to cancel this order? This action cannot be undone.
+            </div>
+            <div class="dialog-buttons">
+                <button class="dialog-button dialog-button-cancel" id="dialog-no">No, keep order</button>
+                <button class="dialog-button dialog-button-confirm" id="dialog-yes">Yes, cancel order</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to show cancel confirmation dialog
+        function showCancelDialog() {
+            const dialog = document.getElementById('cancel-dialog');
+            dialog.style.display = 'flex';
+        }
+
+        // Function to hide cancel confirmation dialog
+        function hideCancelDialog() {
+            const dialog = document.getElementById('cancel-dialog');
+            dialog.style.display = 'none';
+        }
+
+        // Function to cancel the order
+        function cancelOrder() {
+            // Hide the order
+            document.getElementById('current-order').style.display = 'none';
+            
+            // Show the cancelled message
+            document.getElementById('cancelled-message').style.display = 'block';
+        }
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set up cancel button
+            document.getElementById('cancel-button').addEventListener('click', showCancelDialog);
+            
+            // Set up dialog buttons
+            document.getElementById('dialog-no').addEventListener('click', hideCancelDialog);
+            document.getElementById('dialog-yes').addEventListener('click', function() {
+                cancelOrder();
+                hideCancelDialog();
+            });
+        });
+    </script>
+</body>
+</html>

@@ -88,7 +88,7 @@ def update_picker_status(pickerID):
 
 
 
-# Delete a picker
+# Delete a picker -- when picker deletes account
 @app.route("/pickers/<pickerID>", methods=['DELETE'])
 def delete_picker(pickerID):
     picker_ref = db.collection('pickers').document(pickerID)
@@ -98,7 +98,7 @@ def delete_picker(pickerID):
 
 
 
-# Get available pickers WORKS 
+# Get available pickers - will be called by assigned microservice 
 @app.route("/pickers/available", methods=['GET'])
 def get_available_pickers():
     pickers_ref = db.collection('pickers').where("pickerStatus", "==", "Available")
