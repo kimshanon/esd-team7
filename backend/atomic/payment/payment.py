@@ -28,7 +28,7 @@ def get_all_payments():
     else:
         return jsonify({"code": 404, "message": "No payments found."}), 404
     
-# Update payment status
+# Update payment status (includes 'refunded')
 @app.route("/payment/<payment_id>/status", methods=['PUT'])
 def update_payment_status(payment_id):
     data = request.get_json()
