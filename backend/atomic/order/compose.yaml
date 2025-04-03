@@ -1,0 +1,13 @@
+#compose.yaml
+services:
+  order:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    image: order:1.0
+    container_name: order
+    ports:
+      - "5001:5001"
+
+
+

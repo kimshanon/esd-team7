@@ -1,0 +1,4 @@
+#requirements.txt
+Flask==3.1.0
+firebase-admin==6.5.0
+uuid==1.30

@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusEats - Your Orders</title>
+    <style>
+        /* Basic Reset */
+        
+        /* Additional styles for the new location change UI */
+        #current-location-box {
+            margin: 0;
+            padding: 15px 20px;
+            border: none;
+            border-bottom: 1px solid #e0e0e0;
+            background-color: white;
+            border-radius: 0;
+        }
+        
+        .button-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        #choose-new-location-btn, #confirm-btn, #cancel-selection-btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        #confirm-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        /* Header Styles */
+        header {
+            background-color: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .logo {
+            font-weight: bold;
+            font-size: 1.5rem;
+            color: #4285F4;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 25px;
+        }
+        
+        .nav-links a {
+            color: #555;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            padding: 8px 15px;
+            border-radius: 4px;
+        }
+        
+        .nav-links a:hover {
+            color: #4285F4;
+            background-color: #f5f8ff;
+        }
+        
+        .nav-links a.active {
+            color: #ffffff;
+            background-color: #4285F4;
+        }
+
+        .user-icon {
+            width: 32px;
+            height: 32px;
+            background-color: #4285F4;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        /* Main Content */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-size: 1.2rem;
+            margin: 30px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        /* Order Card */
+        .order-card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .order-header {
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .restaurant-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .order-id {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: capitalize;
+        }
+
+        .status-preparing {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+
+        .status-delivered {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .order-content {
+            padding: 15px;
+        }
+
+        .order-info {
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .order-footer {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 15px;
+            background-color: #f9fafb;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .total-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .total-price {
+            font-weight: bold;
+        }
+
+        .no-orders {
+            text-align: center;
+            padding: 40px 0;
+            color: #666;
+        }
+
+        /* Action Buttons */
+        .action-button {
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        .cancel-button {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+
+        .cancel-button:hover {
+            background-color: #fecaca;
+        }
+
+        .change-location-button {
+            background-color: #e0f2fe;
+            color: #0369a1;
+            border: 1px solid #bae6fd;
+        }
+
+        .change-location-button:hover {
+            background-color: #bae6fd;
+        }
+
+        .refund-button {
+            background-color: #f3f4f6;
+            color: #4b5563;
+            border: 1px solid #e5e7eb;
+        }
+
+        .refund-button:hover {
+            background-color: #e5e7eb;
+        }
+
+        /* Forms */
+        .form-container {
+            background-color: #f9fafb;
+            padding: 15px;
+            border-top: 1px solid #e5e7eb;
+            display: none;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .form-group textarea {
+            height: 80px;
+            resize: vertical;
+        }
+
+        .form-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .form-button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .form-button-cancel {
+            background-color: #f3f4f6;
+            border: 1px solid #d1d5db;
+            color: #4b5563;
+        }
+
+        .form-button-submit {
+            background-color: #4285F4;
+            border: 1px solid #3367d6;
+            color: white;
+        }
+
+        /* File Upload Styles */
+        .file-upload {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .file-upload-button {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #e0f2fe;
+            color: #0369a1;
+            border: 1px solid #bae6fd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .file-upload-button:hover {
+            background-color: #bae6fd;
+        }
+
+        .file-upload input[type="file"] {
+            display: none;
+        }
+
+        .file-name {
+            font-size: 0.85rem;
+            color: #4b5563;
+            margin-top: 5px;
+        }
+
+        .image-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .preview-container {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .preview-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .remove-image {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 20px;
+            height: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            color: #ef4444;
+        }
+
+        /* Confirmation Dialog */
+        .dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            display: none;
+        }
+
+        .dialog {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .dialog-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .dialog-content {
+            margin-bottom: 20px;
+        }
+
+        .dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .dialog-button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .dialog-button-cancel {
+            background-color: #f3f4f6;
+            border: 1px solid #d1d5db;
+        }
+
+        .dialog-button-confirm {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+
+        /* Success Message */
+        .success-message {
+            background-color: #d1fae5;
+            border: 1px solid #a7f3d0;
+            color: #065f46;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* Google Maps Integration Styles */
+        #map-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .map-dialog {
+            background-color: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            margin: 30px auto;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .map-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .map-close {
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 0;
+        }
+
+        #selection-box {
+            margin: 0;
+            padding: 15px 20px;
+            border: none;
+            border-bottom: 1px solid #e0e0e0;
+            background-color: white;
+            border-radius: 0;
+        }
+
+        #delivery-container {
+            margin: 0;
+            padding: 15px 20px;
+            border: none;
+            border-bottom: 1px solid #e0e0e0;
+            background-color: white;
+            border-radius: 0;
+        }
+
+        .map-footer {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: flex-end;
+            background-color: #f9fafb;
+        }
+
+        .btn-done {
+            padding: 8px 16px;
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .modal {
+            z-index: 1001; /* Higher than map-container */
+        }
+
+        .modal-content {
+            background-color: #ffffff;
+            margin: 15% auto;
+            padding: 25px;
+            border: none;
+            width: 350px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .map-dialog {
+                width: 95%;
+                margin: 10px auto;
+            }
+
+            #map {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">CampusEats</div>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="food.html">Food</a>
+            <a class="active" href="orders.html">My Orders</a>
+        </div>
+        <div class="user-icon">JD</div>
+    </header>
+
+    <div class="container">
+        <h1>Your Orders</h1>
+
+        <h2>Active Order</h2>
+        <div id="active-order-container">
+            <div class="order-card" id="active-order">
+                <div class="order-header">
+                    <div>
+                        <div class="restaurant-name">Campus Burger</div>
+                        <div class="order-id">Order #ord-001</div>
+                    </div>
+                    <span class="status-badge status-preparing">Preparing</span>
+                </div>
+                <div class="order-content">
+                    <div class="order-info">
+                        <strong>Items:</strong> Double Cheeseburger, Fries, Soda
+                    </div>
+                    <div class="order-info">
+                        <strong>Ordered at:</strong> 12:15 PM
+                    </div>
+                    <div class="order-info">
+                        <strong>Estimated delivery:</strong> 12:45 PM
+                    </div>
+                    <div class="order-info" id="delivery-location-display">
+                        <strong>Delivery location:</strong> Student Union Building, Room 203
+                    </div>
+                    <div class="success-message" id="location-success">
+                        Delivery location updated successfully!
+                    </div>
+                    <button class="action-button change-location-button" id="change-location-button">Change Delivery Location</button>
+                    <button class="action-button cancel-button" id="cancel-button">Cancel Order</button>
+                </div>
+                <div class="order-footer">
+                    <span class="total-label">Total</span>
+                    <span class="total-price">$12.99</span>
+                </div>
+            </div>
+        </div>
+
+        <h2>Completed Orders</h2>
+        <div id="completed-orders-container">
+            <div class="order-card" id="completed-order-1">
+                <div class="order-header">
+                    <div>
+                        <div class="restaurant-name">Panda Express</div>
+                        <div class="order-id">Order #ord-002</div>
+                    </div>
+                    <span class="status-badge status-delivered">Delivered</span>
+                </div>
+                <div class="order-content">
+                    <div class="order-info">
+                        <strong>Items:</strong> Orange Chicken, Fried Rice, Egg Roll
+                    </div>
+                    <div class="order-info">
+                        <strong>Ordered at:</strong> Yesterday, 6:30 PM
+                    </div>
+                    <div class="order-info">
+                        <strong>Delivered at:</strong> Yesterday, 7:05 PM
+                    </div>
+                    <div class="order-info">
+                        <strong>Delivery location:</strong> Library, Study Room 4
+                    </div>
+                    <div class="success-message" id="refund-success-1">
+                        Refund request submitted successfully!
+                    </div>
+                    <button class="action-button refund-button" id="refund-button-1">Request Refund</button>
+                </div>
+                <div class="form-container" id="refund-form-1">
+                    <div class="form-group">
+                        <label for="refund-reason-1">Reason for Refund</label>
+                        <select id="refund-reason-1">
+                            <option value="">Select a reason</option>
+                            <option value="missing-items">Missing items</option>
+                            <option value="wrong-items">Wrong items delivered</option>
+                            <option value="quality">Poor food quality</option>
+                            <option value="late">Extremely late delivery</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="refund-details-1">Additional Details</label>
+                        <textarea id="refund-details-1" placeholder="Please provide more details about your refund request"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Upload Photos (Optional)</label>
+                        <div class="file-upload">
+                            <label class="file-upload-button" for="refund-photos-1">
+                                Choose Photos
+                            </label>
+                            <input type="file" id="refund-photos-1" accept="image/*" multiple>
+                            <div class="file-name" id="file-name-1">No files selected</div>
+                            <div class="image-preview" id="image-preview-1"></div>
+                        </div>
+                    </div>
+                    <div class="form-buttons">
+                        <button class="form-button form-button-cancel" id="refund-cancel-1">Cancel</button>
+                        <button class="form-button form-button-submit" id="refund-submit-1">Submit Request</button>
+                    </div>
+                </div>
+                <div class="order-footer">
+                    <span class="total-label">Total</span>
+                    <span class="total-price">$15.50</span>
+                </div>
+            </div>
+
+            <div class="order-card" id="completed-order-2">
+                <div class="order-header">
+                    <div>
+                        <div class="restaurant-name">Subway</div>
+                        <div class="order-id">Order #ord-003</div>
+                    </div>
+                    <span class="status-badge status-delivered">Delivered</span>
+                </div>
+                <div class="order-content">
+                    <div class="order-info">
+                        <strong>Items:</strong> Italian BMT, Chips, Cookie
+                    </div>
+                    <div class="order-info">
+                        <strong>Ordered at:</strong> 2 days ago, 12:30 PM
+                    </div>
+                    <div class="order-info">
+                        <strong>Delivered at:</strong> 2 days ago, 1:05 PM
+                    </div>
+                    <div class="order-info">
+                        <strong>Delivery location:</strong> Engineering Building, Room 105
+                    </div>
+                    <div class="success-message" id="refund-success-2">
+                        Refund request submitted successfully!
+                    </div>
+                    <button class="action-button refund-button" id="refund-button-2">Request Refund</button>
+                </div>
+                <div class="form-container" id="refund-form-2">
+                    <div class="form-group">
+                        <label for="refund-reason-2">Reason for Refund</label>
+                        <select id="refund-reason-2">
+                            <option value="">Select a reason</option>
+                            <option value="missing-items">Missing items</option>
+                            <option value="wrong-items">Wrong items delivered</option>
+                            <option value="quality">Poor food quality</option>
+                            <option value="late">Extremely late delivery</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="refund-details-2">Additional Details</label>
+                        <textarea id="refund-details-2" placeholder="Please provide more details about your refund request"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Upload Photos (Optional)</label>
+                        <div class="file-upload">
+                            <label class="file-upload-button" for="refund-photos-2">
+                                Choose Photos
+                            </label>
+                            <input type="file" id="refund-photos-2" accept="image/*" multiple>
+                            <div class="file-name" id="file-name-2">No files selected</div>
+                            <div class="image-preview" id="image-preview-2"></div>
+                        </div>
+                    </div>
+                    <div class="form-buttons">
+                        <button class="form-button form-button-cancel" id="refund-cancel-2">Cancel</button>
+                        <button class="form-button form-button-submit" id="refund-submit-2">Submit Request</button>
+                    </div>
+                </div>
+                <div class="order-footer">
+                    <span class="total-label">Total</span>
+                    <span class="total-price">$11.25</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cancel Order Confirmation Dialog -->
+    <div class="dialog-overlay" id="cancel-dialog">
+        <div class="dialog">
+            <div class="dialog-title">Cancel Order</div>
+            <div class="dialog-content">
+                Are you sure you want to cancel this order? This action cannot be undone.
+            </div>
+            <div class="dialog-buttons">
+                <button class="dialog-button dialog-button-cancel" id="dialog-no">No, keep order</button>
+                <button class="dialog-button dialog-button-confirm" id="dialog-yes">Yes, cancel order</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Maps Location Selection Dialog -->
+    <div id="map-container">
+        <div class="map-dialog">
+            <div class="map-header">
+                <div class="map-title">Change Delivery Location</div>
+                <button class="map-close" id="close-map">&times;</button>
+            </div>
+            <div id="map"></div>
+            <div id="current-location-box">
+                <h4>Current Delivery Location:</h4>
+                <p id="current-delivery-location"></p>
+                <button id="choose-new-location-btn" class="action-button change-location-button">Choose New Location</button>
+            </div>
+            <div id="selection-box" style="display: none;">
+                <p>Selected Location: <span id="selected-location"></span></p>
+                <div class="button-container">
+                    <button id="confirm-btn" disabled class="action-button change-location-button">Confirm New Location</button>
+                    <button id="cancel-selection-btn" class="action-button cancel-button">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Original Order Page Functionality
+            const changeLocationBtn = document.getElementById('change-location-button');
+            const locationSuccess = document.getElementById('location-success');
+            const cancelBtn = document.getElementById('cancel-button');
+            const cancelDialog = document.getElementById('cancel-dialog');
+            const dialogNo = document.getElementById('dialog-no');
+            const dialogYes = document.getElementById('dialog-yes');
+            
+            // Map Integration Elements
+            const mapContainer = document.getElementById('map-container');
+            const closeMapBtn = document.getElementById('close-map');
+            const deliveryLocationDisplay = document.getElementById('delivery-location-display');
+
+            // Refund Functionality (from the original page)
+            setupRefundFunctionality('1');
+            setupRefundFunctionality('2');
+
+            // Cancel Order Functionality
+            cancelBtn.addEventListener('click', () => {
+                cancelDialog.style.display = 'flex';
+            });
+
+            dialogNo.addEventListener('click', () => {
+                cancelDialog.style.display = 'none';
+            });
+
+            dialogYes.addEventListener('click', () => {
+                // In a real app, this would send a cancel request to the server
+                document.getElementById('active-order').style.display = 'none';
+                cancelDialog.style.display = 'none';
+            });
+
+            // Change Location - Show Map Interface
+            changeLocationBtn.addEventListener('click', () => {
+                mapContainer.style.display = 'block';
+                initMap(); // Initialize the map when opened
+                
+                // Set up the initial state - show current location only
+                document.getElementById('current-location-box').style.display = 'block';
+                document.getElementById('selection-box').style.display = 'none';
+            });
+
+            // Close Map Interface
+            closeMapBtn.addEventListener('click', () => {
+                mapContainer.style.display = 'none';
+            });
+
+            // Helper function for refund forms
+            function setupRefundFunctionality(orderNum) {
+                const refundBtn = document.getElementById(`refund-button-${orderNum}`);
+                const refundForm = document.getElementById(`refund-form-${orderNum}`);
+                const refundCancel = document.getElementById(`refund-cancel-${orderNum}`);
+                const refundSubmit = document.getElementById(`refund-submit-${orderNum}`);
+                const refundSuccess = document.getElementById(`refund-success-${orderNum}`);
+                const fileInput = document.getElementById(`refund-photos-${orderNum}`);
+                const fileName = document.getElementById(`file-name-${orderNum}`);
+                const imagePreview = document.getElementById(`image-preview-${orderNum}`);
+
+                refundBtn.addEventListener('click', () => {
+                    refundForm.style.display = 'block';
+                    refundBtn.style.display = 'none';
+                });
+
+                refundCancel.addEventListener('click', () => {
+                    refundForm.style.display = 'none';
+                    refundBtn.style.display = 'block';
+                    document.getElementById(`refund-reason-${orderNum}`).value = '';
+                    document.getElementById(`refund-details-${orderNum}`).value = '';
+                    fileInput.value = '';
+                    fileName.textContent = 'No files selected';
+                    imagePreview.innerHTML = '';
+                });
+
+                refundSubmit.addEventListener('click', () => {
+                    const reason = document.getElementById(`refund-reason-${orderNum}`).value;
+                    if (reason) {
+                        refundForm.style.display = 'none';
+                        refundBtn.style.display = 'none';
+                        refundSuccess.style.display = 'block';
+                    }
+                });
+
+                fileInput.addEventListener('change', function() {
+                    if (this.files.length > 0) {
+                        fileName.textContent = `${this.files.length} file(s) selected`;
+                        imagePreview.innerHTML = '';
+                        
+                        for (let i = 0; i < this.files.length; i++) {
+                            const file = this.files[i];
+                            if (file.type.startsWith('image/')) {
+                                const reader = new FileReader();
+                                
+                                reader.onload = function(e) {
+                                    const previewContainer = document.createElement('div');
+                                    previewContainer.className = 'preview-container';
+                                    
+                                    const img = document.createElement('img');
+                                    img.src = e.target.result;
+                                    
+                                    const removeBtn = document.createElement('div');
+                                    removeBtn.className = 'remove-image';
+                                    removeBtn.textContent = '×';
+                                    removeBtn.dataset.index = i;
+                                    
+                                    previewContainer.appendChild(img);
+                                    previewContainer.appendChild(removeBtn);
+                                    imagePreview.appendChild(previewContainer);
+                                    
+                                    removeBtn.addEventListener('click', function() {
+                                        previewContainer.remove();
+                                    });
+                                };
+                                
+                                reader.readAsDataURL(file);
+                            }
+                        }
+                    } else {
+                        fileName.textContent = 'No files selected';
+                        imagePreview.innerHTML = '';
+                    }
+                });
+            }
+        });
+
+        // Google Maps Functionality
+        let map;
+        let markers = [];
+        let currentInfoWindow = null;
+        let selectedLocationName = '';
+        let selectedLocation = null;
+        let currentLocation = null;
+        let changesMade = 0;
+        let changeAllowed = true;
+        let allMarkersVisible = false;
+
+        function initMap() {
+            // Campus center coordinates - This example uses SMU coordinates, replace with your campus
+            const campusCenter = { lat: 1.2955, lng: 103.8495 };
+            
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 17,
+                center: campusCenter
+            });
+            
+            // Sample campus locations - replace with your actual campus buildings
+            const locations = [
+                {
+                    position: { lat: 1.2952469253940524, lng: 103.84974982645213 },
+                    title: "SMU Connexion",
+                    address: "40 Stamford Rd",
+                    postal: "Singapore 178908"
+                },
+                {
+                    position: { lat: 1.2954025541766494, lng: 103.85071292943596 },
+                    title: "SMU Lee Kong Chian School of Business",
+                    address: "50 Stamford Rd",
+                    postal: "Singapore 178899"
+                },
+                {
+                    position: { lat: 1.2958980541549707, lng: 103.84971077997338 },
+                    title: "SMU School of Accountancy",
+                    address: "60 Stamford Rd",
+                    postal: "Singapore 178900"
+                },
+                {
+                    position: { lat: 1.2949679879834028, lng: 103.84943256824556 },
+                    title: "SMU Yong Pung How School of Law",
+                    address: "55 Armenian St",
+                    postal: "Singapore 179943"
+                },
+                {
+                    position: { lat: 1.2938, lng: 103.8480 },
+                    title: "SMU School of Social Sciences",
+                    address: "10 Canning Rise",
+                    postal: "Singapore 179873"
+                },
+                {
+                    position: { lat: 1.2968376100741472, lng: 103.84952837549517 },
+                    title: "SMU Campus Green",
+                    address: "91 Stamford Rd",
+                    postal: "Singapore 178896"
+                },
+                {
+                    position: { lat: 1.297559251046079, lng: 103.84942178220068 },
+                    title: "SMU School of Computing and Information Systems",
+                    address: "80 Stamford Rd",
+                    postal: "Singapore 178902"
+                },
+                {
+                    position: { lat: 1.2978171405381798, lng: 103.84898857294826 },
+                    title: "SMU School of Economics",
+                    address: "90 Stamford Rd",
+                    postal: "Singapore 178903"
+                }
+            ];
+            
+            // Clear existing markers
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+            
+            // Add markers for each location (initially invisible)
+            locations.forEach(function(location) {
+                const marker = new google.maps.Marker({
+                    position: location.position,
+                    map: map,
+                    title: location.title,
+                    animation: google.maps.Animation.DROP,
+                    visible: false
+                });
+                
+                markers.push(marker);
+                
+                // Create info window content
+                const infoContent = `
+                    <div style="padding: 10px; max-width: 300px;">
+                        <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 500;">${location.title}</h3>
+                        <p style="margin: 0; font-size: 14px;">${location.address}</p>
+                        <p style="margin: 0; font-size: 14px;">${location.postal}</p>
+                        <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.title + ' ' + location.address + ' ' + location.postal)}" 
+                           style="color: #1a73e8; text-decoration: none; font-size: 14px; display: block; margin-top: 8px;" 
+                           target="_blank">View on Google Maps</a>
+                    </div>
+                `;
+                
+                // Add info window to each marker
+                const infoWindow = new google.maps.InfoWindow({
+                    content: infoContent,
+                    maxWidth: 300
+                });
+                
+                marker.addListener('click', function() {
+                    // Close the currently open info window if there is one
+                    if (currentInfoWindow) {
+                        currentInfoWindow.close();
+                    }
+                    
+                    // Open this marker's info window
+                    infoWindow.open(map, marker);
+                    
+                    // Update the current info window reference
+                    currentInfoWindow = infoWindow;
+                    
+                    // Update the selection box with the location name
+                    selectedLocationName = location.title;
+                    selectedLocation = location;
+                    document.getElementById('selected-location').textContent = selectedLocationName;
+                    document.getElementById('confirm-btn').disabled = false;
+                });
+            });
+            
+            // Add current location functionality
+            if (navigator.geolocation) {
+                const locationButton = document.createElement("button");
+                locationButton.textContent = "Show My Location";
+                locationButton.classList.add("custom-map-control-button");
+                locationButton.style.backgroundColor = "#fff";
+                locationButton.style.border = "2px solid #fff";
+                locationButton.style.borderRadius = "3px";
+                locationButton.style.boxShadow = "0 2px 6px rgba(0,0,0,.3)";
+                locationButton.style.color = "#333";
+                locationButton.style.cursor = "pointer";
+                locationButton.style.fontFamily = "Roboto,Arial,sans-serif";
+                locationButton.style.fontSize = "16px";
+                locationButton.style.margin = "10px";
+                locationButton.style.padding = "8px 16px";
+                locationButton.style.textAlign = "center";
+                map.controls[google.maps.ControlPosition.TOP_RIGHT].push(locationButton);
+                
+                // Add a blue dot marker for user's location (initially hidden)
+                const userLocationMarker = new google.maps.Marker({
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: "#4285F4",
+                        fillOpacity: 1,
+                        strokeColor: "#fff",
+                        strokeWeight: 2
+                    },
+                    visible: false
+                });
+                
+                // Add accuracy circle (initially hidden)
+                const accuracyCircle = new google.maps.Circle({
+                    map: map,
+                    fillColor: "#4285F4",
+                    fillOpacity: 0.15,
+                    strokeColor: "#4285F4",
+                    strokeOpacity: 0.5,
+                    strokeWeight: 1,
+                    visible: false
+                });
+                
+                locationButton.addEventListener("click", () => {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                                const pos = {
+                                    lat: position.coords.latitude,
+                                    lng: position.coords.longitude,
+                                };
+                                
+                                // Update marker and circle
+                                userLocationMarker.setPosition(pos);
+                                userLocationMarker.setVisible(true);
+                                accuracyCircle.setCenter(pos);
+                                accuracyCircle.setRadius(position.coords.accuracy);
+                                accuracyCircle.setVisible(true);
+                                
+                                map.setCenter(pos);
+                            },
+                            () => {
+                                // Handle location error
+                                alert("Error: The Geolocation service failed.");
+                            }
+                        );
+                    } else {
+                        // Browser doesn't support Geolocation
+                        alert("Error: Your browser doesn't support geolocation.");
+                    }
+                });
+            }
+
+            // Close info window when clicking elsewhere on the map
+            map.addListener('click', function() {
+                if (currentInfoWindow) {
+                    currentInfoWindow.close();
+                    currentInfoWindow = null;
+                }
+            });
+            
+            // Get the current location from the page
+            const currentLocationText = document.getElementById('delivery-location-display').textContent;
+            
+            // Set default current location if not found
+            if (!currentLocation) {
+                currentLocation = {
+                    title: "Student Union Building",
+                    address: "Room 203",
+                    postal: "Singapore 123456",
+                    position: campusCenter
+                };
+            }
+            
+            // Show only the current location marker initially
+            showCurrentLocationMarker();
+            
+            // Set up location selection controls
+            setupLocationSelectionControls();
+        }
+
+        function showCurrentLocationMarker() {
+            // Find the marker that matches the current location
+            const currentMarker = markers.find(marker => marker.getTitle().includes(currentLocation.title));
+            
+            // If found, make it visible and hide others
+            if (currentMarker) {
+                markers.forEach(marker => {
+                    marker.setVisible(marker === currentMarker);
+                });
+                
+                // Center the map on the current location
+                map.setCenter(currentMarker.getPosition());
+                
+                // Update the current location display
+                document.getElementById('current-delivery-location').textContent = 
+                    `${currentMarker.getTitle()}, ${currentLocation.address}, ${currentLocation.postal}`;
+            } else {
+                // If not found, hide all markers
+                markers.forEach(marker => marker.setVisible(false));
+            }
+            
+            allMarkersVisible = false;
+        }
+
+        function showAllLocationMarkers() {
+            // Make all markers visible
+            markers.forEach(marker => marker.setVisible(true));
+            allMarkersVisible = true;
+        }
+
+        function setupLocationSelectionControls() {
+            const currentLocationBox = document.getElementById('current-location-box');
+            const selectionBox = document.getElementById('selection-box');
+            const chooseNewLocationBtn = document.getElementById('choose-new-location-btn');
+            const confirmBtn = document.getElementById('confirm-btn');
+            const cancelSelectionBtn = document.getElementById('cancel-selection-btn');
+            const confirmChangeBtn = document.getElementById('confirm-change-btn');
+            const cancelChangeBtn = document.getElementById('cancel-change-btn');
+            const locationChangeModal = document.getElementById('location-change-modal');
+            
+            // Initially show current location and hide selection
+            currentLocationBox.style.display = 'block';
+            selectionBox.style.display = 'none';
+            
+            // Choose new location button
+            chooseNewLocationBtn.addEventListener('click', function() {
+                // Show all location markers
+                showAllLocationMarkers();
+                
+                // Show selection box and hide current location box
+                currentLocationBox.style.display = 'none';
+                selectionBox.style.display = 'block';
+            });
+            
+            // Cancel selection button
+            cancelSelectionBtn.addEventListener('click', function() {
+                // Show only current location marker
+                showCurrentLocationMarker();
+                
+                // Show current location box and hide selection box
+                currentLocationBox.style.display = 'block';
+                selectionBox.style.display = 'none';
+            });
+            
+            // Confirm button with automatic closing
+            confirmBtn.addEventListener('click', function() {
+                if (selectedLocationName) {
+                    // Update the main page delivery location directly
+                    document.getElementById('delivery-location-display').innerHTML = `
+                        <strong>Delivery location:</strong> ${selectedLocationName}, ${selectedLocation.address}, ${selectedLocation.postal}
+                    `;
+                    
+                    // Store the new location as current
+                    currentLocation = selectedLocation;
+                    
+                    // Close the map container - make sure it's properly closed
+                    document.getElementById('map-container').style.display = 'none';
+                    
+                    // Show success message
+                    const locationSuccess = document.getElementById('location-success');
+                    locationSuccess.style.display = 'block';
+                    setTimeout(() => {
+                        locationSuccess.style.display = 'none';
+                    }, 3000);
+                    
+                    
+                    
+                    // Update backend (simulate API call)
+                    updateLocationInBackend(selectedLocation);
+                }
+            });
+            
+            // Confirm change button in modal
+            confirmChangeBtn.addEventListener('click', function() {
+                // Close the modal
+                locationChangeModal.style.display = 'none';
+                
+                if (changeAllowed) {
+                    // Store the new location as current
+                    currentLocation = selectedLocation;
+                    
+                    // Update the main page delivery location
+                    document.getElementById('delivery-location-display').innerHTML = `
+                        <strong>Delivery location:</strong> ${selectedLocationName}, ${selectedLocation.address}, ${selectedLocation.postal}
+                    `;
+                    
+                    // Close the map container
+                    mapContainer.style.display = 'none';
+                    
+                    // Update the current location display
+                    document.getElementById('current-delivery-location').textContent = 
+                        `${selectedLocationName}, ${selectedLocation.address}, ${selectedLocation.postal}`;
+                    
+                    // Show only the current location marker
+                    showCurrentLocationMarker();
+                    
+                    // Show success message
+                    const locationSuccess = document.getElementById('location-success');
+                    locationSuccess.style.display = 'block';
+                    setTimeout(() => {
+                        locationSuccess.style.display = 'none';
+                    }, 3000);
+                    
+                    // Increment the change counter
+                    changesMade++;
+                    
+                    // Prevent further changes if limit reached
+                    if (changesMade >= 1) {
+                        changeAllowed = false;
+                        chooseNewLocationBtn.disabled = true;
+                        chooseNewLocationBtn.title = 'Location change is limited to once';
+                    }
+                    
+                    // Update backend (simulate API call)
+                    updateLocationInBackend(selectedLocation);
+                }
+            });
+            
+            // Cancel change button in modal
+            cancelChangeBtn.addEventListener('click', function() {
+                // Close the modal without making changes
+                locationChangeModal.style.display = 'none';
+            });
+        }
+
+        function updateLocationInBackend(location) {
+            // Get the order ID from the page
+            const orderIdElement = document.querySelector('.order-id');
+            const orderId = orderIdElement ? orderIdElement.textContent.split('#')[1] : '12345';
+            
+            // Prepare the location data
+            const locationData = {
+                order_id: orderId,
+                location: {
+                    name: location.title,
+                    address: location.address,
+                    postal: location.postal,
+                    coordinates: {
+                        lat: location.position.lat,
+                        lng: location.position.lng
+                    }
+                }
+            };
+            
+            console.log('Updating location for order:', locationData);
+            
+            // Simulate API call (in a real application, this would be an actual fetch)
+            // Comment out the below code to avoid console errors if no backend is available
+            /*
+            fetch('/api/location/update', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(locationData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Location updated successfully:', data);
+            })
+            .catch(error => {
+                console.error('Error updating location:', error);
+            });
+            */
+        }
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDjH28uAStkeoEpvlVqtgt3OJk4_w74iRA"></script>
+</body>
+</html>
