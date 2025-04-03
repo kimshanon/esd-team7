@@ -37,6 +37,18 @@ def get_pickers():
         pickers.append(picker)
     return jsonify(pickers), 200
 
+# GET all Available pickers.
+@app.route('/pickers/available', methods=['GET'])
+def get_pickers():
+    pickers_ref = db.collection('pickers').where("is_available", "==", True)
+    docs = pickers_ref.stream()
+    pickers = []
+    for doc in docs:
+        picker = doc.to_dict()
+        picker['id'] = doc.id
+        pickers.append(picker)
+    return jsonify(pickers), 200
+
 # GET a specific picker by document ID.
 @app.route('/pickers/<picker_id>', methods=['GET'])
 def get_picker(picker_id):

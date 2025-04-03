@@ -1,21 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Picker Interface</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
-        .container { border: 1px solid #ddd; border-radius: 5px; padding: 20px; margin-bottom: 20px; }
-        .message-container { border: 1px solid #ddd; padding: 10px; height: 200px; overflow-y: auto; margin-top: 10px; }
-        button { padding: 10px 15px; margin: 5px 0; background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px; }
-        button:hover { background-color: #45a049; }
-        input { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-        label { font-weight: bold; }
-        .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
-        .connected { background-color: #dff0d8; color: #3c763d; }
-        .disconnected { background-color: #f2dede; color: #a94442; }
-        #pending-orders { margin-top: 15px; }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .container {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .message-container {
+            border: 1px solid #ddd;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 10px 15px;
+            margin: 5px 0;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        input {
+            padding: 8px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .connected {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+
+        .disconnected {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+
+        #pending-orders {
+            margin-top: 15px;
+        }
+
         .order-card {
             border: 1px solid #ddd;
             padding: 15px;
@@ -24,29 +81,34 @@
             background-color: #f9f9f9;
             position: relative;
         }
+
         .accept-btn {
             position: absolute;
             right: 10px;
             top: 10px;
         }
+
         .order-items {
             margin-top: 10px;
             border-top: 1px solid #eee;
             padding-top: 10px;
         }
+
         .item {
             margin-bottom: 5px;
             font-size: 14px;
         }
+
         .picker-controls {
             display: flex;
             gap: 10px;
         }
     </style>
 </head>
+
 <body>
     <h1>Food Delivery - Picker Interface</h1>
-    
+
     <div class="container">
         <h2>Connection Status</h2>
         <div id="status" class="status disconnected">Disconnected</div>
@@ -60,22 +122,22 @@
             <div>
                 <label for="picker-id">Picker ID:</label>
                 <input type="text" id="picker-id" placeholder="Enter your picker ID">
-                
+
                 <label for="picker-name">Name:</label>
                 <input type="text" id="picker-name" placeholder="Your name">
-                
+
                 <label for="picker-email">Email:</label>
                 <input type="email" id="picker-email" placeholder="Your email">
             </div>
             <div>
                 <label for="picker-phone">Phone:</label>
                 <input type="number" id="picker-phone" placeholder="Your phone number">
-                
+
                 <div style="margin-top: 10px;">
                     <label for="picker-availability">Available for orders:</label>
                     <input type="checkbox" id="picker-availability" checked>
                 </div>
-                
+
                 <div class="picker-controls">
                     <button id="register-picker">Register as Picker</button>
                     <button id="create-picker" title="Create a new picker in the database">Create New Picker</button>
@@ -110,7 +172,7 @@
         const pickerEmailInput = document.getElementById('picker-email');
         const pickerPhoneInput = document.getElementById('picker-phone');
         const pickerAvailabilityInput = document.getElementById('picker-availability');
-        
+
         // Track pending orders
         let pendingOrders = {};
 
@@ -134,22 +196,22 @@
 
         function updatePendingOrdersDisplay() {
             pendingOrdersDiv.innerHTML = '';
-            
+
             const orderIds = Object.keys(pendingOrders);
-            
+
             if (orderIds.length === 0) {
                 pendingOrdersDiv.innerHTML = '<p>No pending orders available.</p>';
                 return;
             }
-            
+
             orderIds.forEach(orderId => {
                 const orderData = pendingOrders[orderId];
                 const orderCard = document.createElement('div');
                 orderCard.className = 'order-card';
                 orderCard.id = `order-${orderId}`;
-                
+
                 let orderDetails = `<h3>Order #${orderId}</h3>`;
-                
+
                 if (orderData.details) {
                     const details = orderData.details;
                     orderDetails += `
@@ -157,7 +219,7 @@
                         <p><strong>Delivery Location:</strong> ${details.order_location || 'Not specified'}</p>
                         <p><strong>Status:</strong> ${details.order_status || 'Pending'}</p>
                     `;
-                    
+
                     // Show order items if available
                     if (details.order_items && details.order_items.length > 0) {
                         orderDetails += `<div class="order-items"><h4>Items:</h4>`;
@@ -172,12 +234,12 @@
                         orderDetails += `</div>`;
                     }
                 }
-                
+
                 const acceptBtn = document.createElement('button');
                 acceptBtn.textContent = 'Accept Order';
                 acceptBtn.className = 'accept-btn';
                 acceptBtn.onclick = () => acceptOrder(orderId);
-                
+
                 orderCard.innerHTML = orderDetails;
                 orderCard.appendChild(acceptBtn);
                 pendingOrdersDiv.appendChild(orderCard);
@@ -186,41 +248,41 @@
 
         function acceptOrder(orderId) {
             const pickerId = pickerIdInput.value.trim();
-            
+
             if (!pickerId) {
                 alert('Please enter your Picker ID first.');
                 return;
             }
-            
+
             fetch('http://localhost:5005/picker_accept', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ order_id: orderId, picker_id: pickerId })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                addMessage(`Accepting order #${orderId}: ${JSON.stringify(data)}`);
-            })
-            .catch(err => addMessage(`Error accepting order: ${err.message}`));
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    addMessage(`Accepting order #${orderId}: ${JSON.stringify(data)}`);
+                })
+                .catch(err => addMessage(`Error accepting order: ${err.message}`));
         }
-        
+
         // Create a new picker in the database
         createPickerBtn.addEventListener('click', () => {
             const name = pickerNameInput.value.trim();
             const email = pickerEmailInput.value.trim();
             const phone = pickerPhoneInput.value.trim();
             const isAvailable = pickerAvailabilityInput.checked;
-            
+
             if (!name || !email || !phone) {
                 alert('Please fill in all required picker information.');
                 return;
             }
-            
+
             // Create picker via the API
             fetch('http://localhost:5001/pickers', {
                 method: 'POST',
@@ -232,17 +294,17 @@
                     is_available: isAvailable
                 })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                addMessage(`Picker created with ID: ${data.id}`);
-                pickerIdInput.value = data.id;
-            })
-            .catch(err => addMessage(`Error creating picker: ${err.message}`));
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    addMessage(`Picker created with ID: ${data.id}`);
+                    pickerIdInput.value = data.id;
+                })
+                .catch(err => addMessage(`Error creating picker: ${err.message}`));
         });
 
         connectBtn.addEventListener('click', () => {
@@ -250,14 +312,15 @@
                 addMessage('Already connected.');
                 return;
             }
-            
+
             socket = io('http://localhost:5005');
-            
+
             socket.on('connect', () => {
                 updateConnectionStatus(true);
                 addMessage('Connected to WebSocket server.');
+                console.log('Socket connected with ID:', socket.id);
             });
-            
+
             socket.on('disconnect', () => {
                 updateConnectionStatus(false);
                 addMessage('Disconnected from server.');
@@ -265,19 +328,28 @@
                 updatePendingOrdersDisplay();
                 socket = null;
             });
-            
+
+            // In picker.html, add more robust data handling:
             socket.on('order_waiting', data => {
+                console.log('Received order_waiting event:', data);
                 addMessage(`New order available: #${data.order_id}`);
+
+                // Make sure data has the right structure
+                if (!data.order_id) {
+                    console.error('Missing order_id in data:', data);
+                    return;
+                }
+
                 pendingOrders[data.order_id] = data;
                 updatePendingOrdersDisplay();
             });
-            
+
             socket.on('order_taken', data => {
                 addMessage(`Order #${data.order_id} has been taken by picker #${data.picker_id}.`);
                 delete pendingOrders[data.order_id];
                 updatePendingOrdersDisplay();
             });
-            
+
             socket.on('order_cancelled', data => {
                 addMessage(`Order #${data.order_id} has been cancelled.`);
                 delete pendingOrders[data.order_id];
@@ -294,17 +366,17 @@
 
         registerPickerBtn.addEventListener('click', () => {
             const pickerId = pickerIdInput.value.trim();
-            
+
             if (!pickerId) {
                 alert('Please enter your Picker ID.');
                 return;
             }
-            
+
             if (!socket) {
                 alert('Please connect to the server first.');
                 return;
             }
-            
+
             // Update availability if needed
             const isAvailable = pickerAvailabilityInput.checked;
             fetch(`http://localhost:5001/pickers/${pickerId}/availability`, {
@@ -312,24 +384,25 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ is_available: isAvailable })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Failed to update availability. Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(() => {
-                // Now register with the socket server
-                socket.emit('register_picker', { picker_id: pickerId });
-                addMessage(`Registered as Picker #${pickerId} (Available: ${isAvailable ? 'Yes' : 'No'})`);
-            })
-            .catch(err => {
-                addMessage(`Error updating availability: ${err.message}`);
-                // Still try to register with socket
-                socket.emit('register_picker', { picker_id: pickerId });
-                addMessage(`Registered as Picker #${pickerId}`);
-            });
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to update availability. Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(() => {
+                    // Now register with the socket server
+                    socket.emit('register_picker', { picker_id: pickerId });
+                    addMessage(`Registered as Picker #${pickerId} (Available: ${isAvailable ? 'Yes' : 'No'})`);
+                })
+                .catch(err => {
+                    addMessage(`Error updating availability: ${err.message}`);
+                    // Still try to register with socket
+                    socket.emit('register_picker', { picker_id: pickerId });
+                    addMessage(`Registered as Picker #${pickerId}`);
+                });
         });
     </script>
 </body>
+
 </html>
