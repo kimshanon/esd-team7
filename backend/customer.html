@@ -2,61 +2,205 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Customer Interface</title>
+    <title>Customer Order Interface</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; }
-        .message-container { border: 1px solid #ddd; padding: 10px; height: 300px; overflow-y: auto; }
-        button { padding: 10px 15px; margin: 5px; }
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
+        .container { border: 1px solid #ddd; border-radius: 5px; padding: 20px; margin-bottom: 20px; }
+        .message-container { border: 1px solid #ddd; padding: 10px; height: 300px; overflow-y: auto; margin-top: 10px; }
+        button { padding: 10px 15px; margin: 5px 0; background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        button:hover { background-color: #45a049; }
+        input, select, textarea { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        label { font-weight: bold; }
+        .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .connected { background-color: #dff0d8; color: #3c763d; }
+        .disconnected { background-color: #f2dede; color: #a94442; }
+        .order-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .order-items { border: 1px solid #ddd; padding: 10px; margin-top: 10px; }
+        .item-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .item-row button { background-color: #f44336; }
     </style>
 </head>
 <body>
-    <h1>Customer Interface</h1>
-    <div>
-        <label for="order-id">Order ID:</label>
-        <input type="text" id="order-id" placeholder="Enter order ID">
-        <button id="send-order">Send Order</button>
+    <h1>Food Delivery - Customer Order Interface</h1>
+    
+    <div class="container">
+        <h2>Connection Status</h2>
+        <div id="status" class="status disconnected">Disconnected</div>
+        <button id="connect">Connect</button>
+        <button id="disconnect">Disconnect</button>
     </div>
-    <hr>
-    <div id="status">Disconnected</div>
-    <button id="connect">Connect</button>
-    <button id="disconnect">Disconnect</button>
-    <hr>
-    <h2>Messages</h2>
-    <div class="message-container" id="messages"></div>
+
+    <div class="container">
+        <h2>Create New Order</h2>
+        <div class="order-form">
+            <div>
+                <label for="customer-id">Customer ID:</label>
+                <input type="text" id="customer-id" placeholder="Enter your customer ID" required>
+                
+                <label for="stall-id">Stall ID:</label>
+                <input type="text" id="stall-id" placeholder="Enter stall ID" required>
+                
+                <label for="order-location">Delivery Location:</label>
+                <input type="text" id="order-location" placeholder="Enter delivery location" required>
+                
+                <div class="order-items">
+                    <h3>Order Items</h3>
+                    <div id="items-container"></div>
+                    <button type="button" id="add-item">Add Item</button>
+                </div>
+            </div>
+            <div>
+                <div class="order-summary">
+                    <h3>Order Summary</h3>
+                    <div id="order-summary">
+                        No items added yet
+                    </div>
+                    <p>Total: $<span id="order-total">0.00</span></p>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button id="create-order" style="width: 100%">Create Order</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Track Order</h2>
+        <input type="text" id="track-order-id" placeholder="Enter order ID to track">
+        <button id="track-order">Track This Order</button>
+    </div>
+
+    <div class="container">
+        <h2>Messages & Updates</h2>
+        <div class="message-container" id="messages"></div>
+    </div>
+
     <script>
         let socket = null;
+        let currentOrderId = null;
+        let orderItems = [];
         const statusDiv = document.getElementById('status');
         const messagesDiv = document.getElementById('messages');
         const connectBtn = document.getElementById('connect');
         const disconnectBtn = document.getElementById('disconnect');
-        const sendOrderBtn = document.getElementById('send-order');
-        const orderIdInput = document.getElementById('order-id');
+        const createOrderBtn = document.getElementById('create-order');
+        const trackOrderBtn = document.getElementById('track-order');
+        const addItemBtn = document.getElementById('add-item');
+        const itemsContainer = document.getElementById('items-container');
+        const orderSummary = document.getElementById('order-summary');
+        const orderTotal = document.getElementById('order-total');
 
         function addMessage(msg) {
             const p = document.createElement('p');
-            p.textContent = msg;
+            const timestamp = new Date().toLocaleTimeString();
+            p.innerHTML = `<strong>${timestamp}</strong>: ${msg}`;
             messagesDiv.appendChild(p);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
+
+        function updateConnectionStatus(connected) {
+            if (connected) {
+                statusDiv.textContent = 'Connected';
+                statusDiv.className = 'status connected';
+            } else {
+                statusDiv.textContent = 'Disconnected';
+                statusDiv.className = 'status disconnected';
+            }
+        }
+
+        function addItemRow() {
+            const itemId = Date.now(); // Unique ID for this item row
+            const row = document.createElement('div');
+            row.className = 'item-row';
+            row.dataset.id = itemId;
+            
+            row.innerHTML = `
+                <input type="text" placeholder="Item name" class="item-name" required>
+                <input type="number" placeholder="Quantity" min="1" value="1" class="item-quantity" required>
+                <input type="number" placeholder="Price" min="0.01" step="0.01" class="item-price" required>
+                <button type="button" class="remove-item">✕</button>
+            `;
+            
+            itemsContainer.appendChild(row);
+            
+            // Add event listener to remove button
+            row.querySelector('.remove-item').addEventListener('click', function() {
+                itemsContainer.removeChild(row);
+                updateOrderSummary();
+            });
+            
+            // Add event listeners to update summary when values change
+            row.querySelectorAll('input').forEach(input => {
+                input.addEventListener('input', updateOrderSummary);
+            });
+        }
+
+        function updateOrderSummary() {
+            // Collect all item data
+            const items = [];
+            let total = 0;
+            
+            document.querySelectorAll('.item-row').forEach(row => {
+                const nameInput = row.querySelector('.item-name');
+                const quantityInput = row.querySelector('.item-quantity');
+                const priceInput = row.querySelector('.item-price');
+                
+                const name = nameInput.value || 'Unnamed item';
+                const quantity = parseInt(quantityInput.value) || 0;
+                const price = parseFloat(priceInput.value) || 0;
+                
+                const itemTotal = quantity * price;
+                total += itemTotal;
+                
+                items.push({
+                    name,
+                    quantity,
+                    price,
+                    total: itemTotal
+                });
+            });
+            
+            // Update the summary
+            if (items.length === 0) {
+                orderSummary.innerHTML = 'No items added yet';
+            } else {
+                orderSummary.innerHTML = items.map(item => 
+                    `<p>${item.quantity}x ${item.name} @ $${item.price.toFixed(2)} = $${item.total.toFixed(2)}</p>`
+                ).join('');
+            }
+            
+            // Update the total
+            orderTotal.textContent = total.toFixed(2);
+            
+            // Save items for order creation
+            orderItems = items;
+        }
+
+        addItemBtn.addEventListener('click', addItemRow);
 
         connectBtn.addEventListener('click', () => {
             if (socket) {
                 addMessage('Already connected.');
                 return;
             }
+            
             socket = io('http://localhost:5005');
+            
             socket.on('connect', () => {
-                statusDiv.textContent = 'Connected';
+                updateConnectionStatus(true);
                 addMessage('Connected to WebSocket server.');
             });
+            
             socket.on('disconnect', () => {
-                statusDiv.textContent = 'Disconnected';
+                updateConnectionStatus(false);
                 addMessage('Disconnected from server.');
                 socket = null;
             });
+            
             socket.on('picker_update', data => {
-                addMessage('Picker update: ' + JSON.stringify(data));
+                addMessage(`<b>Order Update:</b> Order #${data.order_id} has been accepted by picker #${data.picker_id}. Status: ${data.status}`);
             });
         });
 
@@ -67,21 +211,88 @@
             }
         });
 
-        sendOrderBtn.addEventListener('click', () => {
-            const orderId = orderIdInput.value.trim();
-            if (!orderId) {
-                alert('Please enter an Order ID');
+        createOrderBtn.addEventListener('click', () => {
+            const customerId = document.getElementById('customer-id').value.trim();
+            const stallId = document.getElementById('stall-id').value.trim();
+            const orderLocation = document.getElementById('order-location').value.trim();
+            
+            if (!customerId || !stallId || !orderLocation) {
+                alert('Please fill in all required fields.');
                 return;
             }
-            fetch('http://localhost:5005/assign_order', {
+            
+            if (orderItems.length === 0) {
+                alert('Please add at least one item to your order.');
+                return;
+            }
+            
+            // Format order items according to the OrderItemModel
+            const formattedItems = orderItems.map(item => ({
+                order_item: item.name,
+                order_quantity: item.quantity,
+                order_price: item.price
+            }));
+            
+            const orderData = {
+                customer_id: customerId,
+                stall_id: stallId,
+                order_location: orderLocation,
+                order_status: "pending",
+                is_paid: false,
+                order_items: formattedItems
+            };
+            
+            addMessage('Creating order: ' + JSON.stringify(orderData));
+            
+            fetch('http://localhost:5005/orders', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ order_id: orderId })
+                body: JSON.stringify(orderData)
             })
-            .then(response => response.json())
-            .then(data => addMessage('Order Response: ' + JSON.stringify(data)))
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                addMessage('Order created! Order ID: ' + data.order_id);
+                currentOrderId = data.order_id;
+                
+                // Register for updates on this order
+                if (socket) {
+                    socket.emit('register_customer', {
+                        customer_id: customerId,
+                        order_id: currentOrderId
+                    });
+                    addMessage('Registered for updates on this order.');
+                }
+            })
             .catch(err => addMessage('Error: ' + err.message));
         });
+
+        trackOrderBtn.addEventListener('click', () => {
+            const orderId = document.getElementById('track-order-id').value.trim();
+            const customerId = document.getElementById('customer-id').value.trim();
+            
+            if (!orderId || !customerId) {
+                alert('Please enter both order ID and customer ID.');
+                return;
+            }
+            
+            if (socket) {
+                socket.emit('register_customer', {
+                    customer_id: customerId,
+                    order_id: orderId
+                });
+                addMessage(`Now tracking updates for order #${orderId}`);
+            } else {
+                addMessage('Please connect to the server first.');
+            }
+        });
+        
+        // Add an initial item row
+        addItemRow();
     </script>
 </body>
 </html>

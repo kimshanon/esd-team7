@@ -1,209 +1,289 @@
 import os
+import sys
 from datetime import datetime
 from flask import Flask, request, jsonify, abort
-from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
+from dotenv import load_dotenv
+import firebase_admin
+from firebase_admin import credentials, firestore
+from pydantic import ValidationError
+
+# Add parent directory to path to resolve module imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Import the Pydantic model
+from models.order_model import OrderModel, OrderItemModel
+
+load_dotenv()  # Loads the .env file
+
+# Initialize Firebase (if not already initialized)
+if not firebase_admin._apps:
+    cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
+    cred = credentials.Certificate(cred_path)
+    firebase_admin.initialize_app(cred)
+
+# Set Firestore DB client.
+db = firestore.client()
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
-# Build the database path. Assuming the following structure:
-basedir = os.path.abspath(os.path.dirname(__file__))
-db_dir = os.path.join(basedir, '..', 'database')
-if not os.path.exists(db_dir):
-    os.makedirs(db_dir)
-db_path = os.path.join(db_dir, 'main.db')
-
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
-
-# ---------------------------
-# Models
-# ---------------------------
-
-class Order(db.Model):
-    order_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    customer_id = db.Column(db.Integer, nullable=False)
-    picker_id = db.Column(db.Integer, nullable=False)
-    store_id = db.Column(db.Integer, nullable=False)
-    order_status = db.Column(db.String(50), nullable=False)
-    order_location = db.Column(db.String(255), nullable=False)
-    order_start = db.Column(db.DateTime, nullable=False)
-    order_completed = db.Column(db.DateTime, nullable=True)
-    is_paid = db.Column(db.Boolean, nullable=False, default=False)
-    # Relationship to OrderItem
-    order_items = db.relationship('OrderItem', backref='order', cascade="all, delete-orphan", lazy=True)
-
-    def as_dict(self):
-        return {
-            "order_id": self.order_id,
-            "customer_id": self.customer_id,
-            "picker_id": self.picker_id,
-            "store_id": self.store_id,
-            "order_status": self.order_status,
-            "order_location": self.order_location,
-            "order_start": self.order_start.isoformat() if self.order_start else None,
-            "order_completed": self.order_completed.isoformat() if self.order_completed else None,
-            "is_paid": self.is_paid,
-            "order_items": [item.as_dict() for item in self.order_items]
-        }
-
-class OrderItem(db.Model):
-    order_item_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('order.order_id'), nullable=False)
-    order_item = db.Column(db.String(100), nullable=False)
-    order_quantity = db.Column(db.Integer, nullable=False)
-    order_price = db.Column(db.Float, nullable=False)
-
-    def as_dict(self):
-        return {
-            "order_item_id": self.order_item_id,
-            "order_item": self.order_item,
-            "order_quantity": self.order_quantity,
-            "order_price": self.order_price
-        }
-
-with app.app_context():
-    db.create_all()
-
-# ---------------------------
-# Endpoints
-# ---------------------------
-
-# GET all orders
+# GET all orders (including their order items)
 @app.route('/orders', methods=['GET'])
 def get_orders():
-    orders = Order.query.all()
-    return jsonify([order.as_dict() for order in orders]), 200
+    orders_ref = db.collection('orders')
+    docs = orders_ref.stream()
+    orders = []
+    for doc in docs:
+        order = doc.to_dict()
+        order['id'] = doc.id
+        # Get order items from subcollection "order_items"
+        items = []
+        for item_doc in doc.reference.collection('order_items').stream():
+            item = item_doc.to_dict()
+            item['id'] = item_doc.id
+            items.append(item)
+        order['order_items'] = items
+        orders.append(order)
+    return jsonify(orders), 200
 
-# GET a specific order by order_id
-@app.route('/orders/<int:order_id>', methods=['GET'])
+# GET a specific order by order_id.
+@app.route('/orders/<order_id>', methods=['GET'])
 def get_order(order_id):
-    order = Order.query.get(order_id)
-    if not order:
+    doc_ref = db.collection('orders').document(order_id)
+    doc = doc_ref.get()
+    if not doc.exists:
         abort(404, description="Order not found")
-    return jsonify(order.as_dict()), 200
+    order = doc.to_dict()
+    order['id'] = doc.id
+    items = []
+    for item_doc in doc_ref.collection('order_items').stream():
+        item = item_doc.to_dict()
+        item['id'] = item_doc.id
+        items.append(item)
+    order['order_items'] = items
+    return jsonify(order), 200
 
-# POST create a new order (with multiple order items)
+# POST create a new order (with multiple order items) using Pydantic validation.
 @app.route('/orders', methods=['POST'])
 def create_order():
-    if not request.json:
-        abort(400, description="Missing JSON body")
-    data = request.json
-    # Validate required fields for the order
-    required_fields = ['customer_id', 'picker_id', 'store_id', 'order_status', 'order_location', 'order_start', 'is_paid']
-    for field in required_fields:
-        if field not in data:
-            abort(400, description=f"Missing required field: {field}")
-
-    # Parse datetime values from ISO format strings
-    try:
-        order_start = datetime.fromisoformat(data['order_start'])
-    except Exception:
-        abort(400, description="Invalid order_start format. Use ISO format (e.g., '2025-03-18T12:34:56').")
-    
-    order_completed = None
-    if 'order_completed' in data and data['order_completed']:
-        try:
-            order_completed = datetime.fromisoformat(data['order_completed'])
-        except Exception:
-            abort(400, description="Invalid order_completed format. Use ISO format.")
-
-    new_order = Order(
-        customer_id=data['customer_id'],
-        picker_id=data['picker_id'],
-        store_id=data['store_id'],
-        order_status=data['order_status'],
-        order_location=data['order_location'],
-        order_start=order_start,
-        order_completed=order_completed,
-        is_paid=data['is_paid']
-    )
-
-    # Validate and process order_items
-    if 'order_items' not in data or not isinstance(data['order_items'], list):
-        abort(400, description="Missing or invalid order_items; expected a list.")
-    
-    for item in data['order_items']:
-        if 'order_item' not in item or 'order_quantity' not in item or 'order_price' not in item:
-            abort(400, description="Each order item must include 'order_item','order_quantity' and 'order_price.")
-        new_item = OrderItem(
-            order_item=item['order_item'],
-            order_quantity=item['order_quantity'],
-            order_price=item['order_price']
-        )
-        new_order.order_items.append(new_item)
-
-    db.session.add(new_order)
-    db.session.commit()
-    return jsonify(new_order.as_dict()), 201
-
-# PUT update an existing order
-@app.route('/orders/<int:order_id>', methods=['PUT'])
-def update_order(order_id):
-    order = Order.query.get(order_id)
-    if not order:
-        abort(404, description="Order not found")
-    data = request.json
+    data = request.get_json()
     if not data:
         abort(400, description="Missing JSON body")
+    
+    # Validate incoming data with the OrderModel
+    try:
+        order_model = OrderModel(**data)
+        
+        # Build order document data for Firestore
+        order_data = order_model.to_dict()
+        
+        # Create order document
+        doc_ref = db.collection('orders').document()
+        doc_ref.set(order_data)
+        
+        # Process and add each order item to the "order_items" subcollection
+        for item in order_model.order_items:
+            doc_ref.collection('order_items').add(item.to_dict())
+        
+        # Return the new order with its ID and items
+        new_order = order_data
+        new_order['id'] = doc_ref.id
+        
+        # Include serialized order items in the response
+        new_order['order_items'] = [
+            {**item.to_dict(), 'id': i} 
+            for i, item in enumerate(order_model.order_items)
+        ]
+        
+        return jsonify(new_order), 201
+        
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
 
-    # Update basic order fields if provided
-    if 'customer_id' in data:
-        order.customer_id = data['customer_id']
-    if 'picker_id' in data:
-        order.picker_id = data['picker_id']
-    if 'store_id' in data:
-        order.store_id = data['store_id']
-    if 'order_status' in data:
-        order.order_status = data['order_status']
-    if 'order_location' in data:
-        order.order_location = data['order_location']
-    if 'order_start' in data:
-        try:
-            order.order_start = datetime.fromisoformat(data['order_start'])
-        except Exception:
-            abort(400, description="Invalid order_start format. Use ISO format.")
-    if 'order_completed' in data:
-        if data['order_completed']:
-            try:
-                order.order_completed = datetime.fromisoformat(data['order_completed'])
-            except Exception:
-                abort(400, description="Invalid order_completed format. Use ISO format.")
-        else:
-            order.order_completed = None
-    if 'is_paid' in data:
-        order.is_paid = data['is_paid']
-
-    # Update order_items if provided: here, we'll assume a full replacement of order_items.
-    if 'order_items' in data:
-        # Remove existing order items
-        for item in order.order_items:
-            db.session.delete(item)
-        order.order_items = []
-        if not isinstance(data['order_items'], list):
-            abort(400, description="order_items should be a list")
-        for item in data['order_items']:
-            if 'order_item' not in item or 'order_quantity' not in item:
-                abort(400, description="Each order item must include 'order_item' and 'order_quantity'")
-            new_item = OrderItem(
-                order_item=item['order_item'],
-                order_quantity=item['order_quantity']
-            )
-            order.order_items.append(new_item)
-
-    db.session.commit()
-    return jsonify(order.as_dict()), 200
-
-# DELETE an order by order_id
-@app.route('/orders/<int:order_id>', methods=['DELETE'])
-def delete_order(order_id):
-    order = Order.query.get(order_id)
-    if not order:
+# PUT update an existing order.
+@app.route('/orders/<order_id>', methods=['PUT'])
+def update_order(order_id):
+    data = request.get_json()
+    if not data:
+        abort(400, description="Missing JSON body")
+    
+    order_doc_ref = db.collection('orders').document(order_id)
+    order_doc = order_doc_ref.get()
+    if not order_doc.exists:
         abort(404, description="Order not found")
-    db.session.delete(order)
-    db.session.commit()
-    return jsonify({"message": f"Order {order_id} deleted"}), 200
+    
+    # Get current data and merge with update
+    current_data = order_doc.to_dict()
+    
+    # Get current order items
+    current_items = []
+    for item_doc in order_doc_ref.collection('order_items').stream():
+        item = item_doc.to_dict()
+        item['id'] = item_doc.id
+        current_items.append(item)
+    
+    # Extract order items from the update if present
+    update_items = data.pop('order_items', None)
+    
+    # Update the main order data
+    if data:
+        current_data.update(data)
+    
+    try:
+        # Validate the order data (without items for now)
+        temp_items = current_items if update_items is None else update_items
+        order_model = OrderModel.from_dict(current_data, temp_items)
+        
+        # Update the order document with validated data
+        order_doc_ref.update(order_model.to_dict())
+        
+        # If new order items were provided, handle them
+        if update_items is not None:
+            # Delete existing order items
+            for item_doc in order_doc_ref.collection('order_items').stream():
+                item_doc.reference.delete()
+            
+            # Add new order items
+            for item_data in update_items:
+                # Remove any id field as it's not part of the model
+                if 'id' in item_data:
+                    item_data.pop('id')
+                
+                # Validate item data
+                item_model = OrderItemModel(**item_data)
+                
+                # Add to Firestore
+                order_doc_ref.collection('order_items').add(item_model.to_dict())
+        
+        # Return the updated order with its items
+        updated_order = order_model.to_dict()
+        updated_order['id'] = order_id
+        
+        # Get the updated items from Firestore
+        items = []
+        for item_doc in order_doc_ref.collection('order_items').stream():
+            item = item_doc.to_dict()
+            item['id'] = item_doc.id
+            items.append(item)
+        updated_order['order_items'] = items
+        
+        return jsonify(updated_order), 200
+        
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
+
+# PATCH to update order status
+@app.route('/orders/<order_id>/status', methods=['PATCH'])
+def update_order_status(order_id):
+    data = request.get_json()
+    if not data or 'order_status' not in data:
+        abort(400, description="Request must include 'order_status'")
+    
+    order_doc_ref = db.collection('orders').document(order_id)
+    order_doc = order_doc_ref.get()
+    if not order_doc.exists:
+        abort(404, description="Order not found")
+    
+    # Get current data and update status
+    current_data = order_doc.to_dict()
+    current_data['order_status'] = data['order_status']
+    
+    # If status is completed, add completion timestamp
+    if data['order_status'] == 'completed':
+        current_data['order_completed'] = datetime.now().isoformat()
+    
+    try:
+        # Validate with the current items
+        items = []
+        for item_doc in order_doc_ref.collection('order_items').stream():
+            item = item_doc.to_dict()
+            items.append(item)
+        
+        # Create model instance to validate
+        order_model = OrderModel.from_dict(current_data, items)
+        
+        # Update only the status field
+        update_data = {'order_status': data['order_status']}
+        if data['order_status'] == 'completed':
+            update_data['order_completed'] = current_data['order_completed']
+        
+        order_doc_ref.update(update_data)
+        
+        # Return success response
+        return jsonify({
+            'id': order_id,
+            'order_status': data['order_status'],
+            'message': f"Order status updated to {data['order_status']}"
+        }), 200
+        
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
+
+# DELETE an order by order_id.
+@app.route('/orders/<order_id>', methods=['DELETE'])
+def delete_order(order_id):
+    order_doc_ref = db.collection('orders').document(order_id)
+    order_doc = order_doc_ref.get()
+    if not order_doc.exists:
+        abort(404, description="Order not found")
+    
+    # Delete all order items in the subcollection first
+    for item_doc in order_doc_ref.collection('order_items').stream():
+        item_doc.reference.delete()
+    
+    # Then delete the main order document
+    order_doc_ref.delete()
+    
+    return jsonify({
+        "message": f"Order {order_id} and all its items deleted successfully"
+    }), 200
+
+# Optional: Add an endpoint to get all orders for a specific customer
+@app.route('/customers/<customer_id>/orders', methods=['GET'])
+def get_customer_orders(customer_id):
+    orders_ref = db.collection('orders').where('customer_id', '==', customer_id)
+    docs = orders_ref.stream()
+    
+    orders = []
+    for doc in docs:
+        order = doc.to_dict()
+        order['id'] = doc.id
+        
+        # Get order items
+        items = []
+        for item_doc in doc.reference.collection('order_items').stream():
+            item = item_doc.to_dict()
+            item['id'] = item_doc.id
+            items.append(item)
+        
+        order['order_items'] = items
+        orders.append(order)
+    
+    return jsonify(orders), 200
+
+# Optional: Add an endpoint to get all orders assigned to a specific picker
+@app.route('/pickers/<picker_id>/orders', methods=['GET'])
+def get_picker_orders(picker_id):
+    orders_ref = db.collection('orders').where('picker_id', '==', picker_id)
+    docs = orders_ref.stream()
+    
+    orders = []
+    for doc in docs:
+        order = doc.to_dict()
+        order['id'] = doc.id
+        
+        # Get order items
+        items = []
+        for item_doc in doc.reference.collection('order_items').stream():
+            item = item_doc.to_dict()
+            item['id'] = item_doc.id
+            items.append(item)
+        
+        order['order_items'] = items
+        orders.append(order)
+    
+    return jsonify(orders), 200
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5004)
+    app.run(debug=True, host='0.0.0.0', port=5003, threaded=True)

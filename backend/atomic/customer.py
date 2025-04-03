@@ -1,100 +1,113 @@
 from flask import Flask, request, jsonify, abort
-from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 import os
+from dotenv import load_dotenv
+import firebase_admin
+from firebase_admin import credentials, firestore
+from pydantic import ValidationError
+from models.customer_model import CustomerModel
+
+load_dotenv()  # Loads the .env file
+
+# Initialize firebase
+if not firebase_admin._apps:
+    cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
+    cred = credentials.Certificate(cred_path)
+    firebase_admin.initialize_app(cred)
+
+# Set DB
+db = firestore.client()
 
 app = Flask(__name__)
-
-# Get the directory of the current file.
-basedir = os.path.abspath(os.path.dirname(__file__))
-# Build the path to the "database" folder.
-db_dir = os.path.join(basedir, '..', 'database')
-# Ensure the "database" folder exists.
-if not os.path.exists(db_dir):
-    os.makedirs(db_dir)
-
-# Build the full path to the main.db file.
-db_path = os.path.join(db_dir, 'main.db')
-
-# Configure the database URI using the absolute path.
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
-
-# Define the Customer model with snake_case field names.
-class Customer(db.Model):
-    customer_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    customer_name = db.Column(db.String(80), nullable=False)
-    customer_email = db.Column(db.String(120), nullable=False)
-    customer_phone = db.Column(db.Integer, nullable=False)
-
-    def as_dict(self):
-        return {
-            "customer_id": self.customer_id,
-            "customer_name": self.customer_name,
-            "customer_phone": self.customer_phone,
-            "customer_email": self.customer_email
-        }
-
-# Create the database and tables if they don't exist.
-with app.app_context():
-    db.create_all()
+CORS(app)  # Enable CORS for all routes
 
 # GET all customers.
 @app.route('/customers', methods=['GET'])
 def get_customers():
-    customers = Customer.query.all()
-    return jsonify([customer.as_dict() for customer in customers]), 200
+    customers_ref = db.collection('customers')
+    docs = customers_ref.stream()
+    customers = []
+    for doc in docs:
+        data = doc.to_dict()
+        data['id'] = doc.id
+        customers.append(data)
+    return jsonify(customers), 200
 
-# GET a specific customer by customer_id.
-@app.route('/customers/<int:customer_id>', methods=['GET'])
+# GET a specific customer by document ID.
+@app.route('/customers/<customer_id>', methods=['GET'])
 def get_customer(customer_id):
-    customer = Customer.query.get(customer_id)
-    if not customer:
+    doc_ref = db.collection('customers').document(customer_id)
+    doc = doc_ref.get()
+    if not doc.exists:
         abort(404, description="Customer not found")
-    return jsonify(customer.as_dict()), 200
+    customer = doc.to_dict()
+    customer['id'] = doc.id
+    return jsonify(customer), 200
 
 # POST a new customer.
 @app.route('/customers', methods=['POST'])
 def create_customer():
-    if not request.json or not all(key in request.json for key in ['customer_name', 'customer_phone', 'customer_email']):
-        abort(400, description="Missing required customer fields")
-    
-    new_customer = Customer(
-        customer_name=request.json['customer_name'],
-        customer_phone=request.json['customer_phone'],
-        customer_email=request.json['customer_email']
-    )
-    db.session.add(new_customer)
-    db.session.commit()
-
-    return jsonify(new_customer.as_dict()), 201
-
-# PUT update an existing customer.
-@app.route('/customers/<int:customer_id>', methods=['PUT'])
-def update_customer(customer_id):
-    customer = Customer.query.get(customer_id)
-    if not customer:
-        abort(404, description="Customer not found")
-    if not request.json:
+    data = request.get_json()
+    if not data:
         abort(400, description="Missing request body")
     
-    customer.customer_name = request.json.get('customer_name', customer.customer_name)
-    customer.customer_phone = request.json.get('customer_phone', customer.customer_phone)
-    customer.customer_email = request.json.get('customer_email', customer.customer_email)
-    
-    db.session.commit()
-    return jsonify(customer.as_dict()), 200
+    try:
+        # Validate data using Pydantic model
+        customer_data = CustomerModel(**data)
+        
+        # Add a new document; Firestore will generate a unique document ID.
+        doc_ref = db.collection('customers').document()
+        doc_ref.set(customer_data.to_dict())
+        
+        # Return the new customer with its ID
+        new_customer = customer_data.to_dict()
+        new_customer['id'] = doc_ref.id
+        return jsonify(new_customer), 201
+        
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
 
-# DELETE a customer by customer_id.
-@app.route('/customers/<int:customer_id>', methods=['DELETE'])
-def delete_customer(customer_id):
-    customer = Customer.query.get(customer_id)
-    if not customer:
+# PUT update an existing customer.
+@app.route('/customers/<customer_id>', methods=['PUT'])
+def update_customer(customer_id):
+    data = request.json
+    if not data:
+        abort(400, description="Missing request body")
+    
+    doc_ref = db.collection('customers').document(customer_id)
+    doc = doc_ref.get()
+    if not doc.exists:
         abort(404, description="Customer not found")
-    db.session.delete(customer)
-    db.session.commit()
+    
+    # Get current data and update with new data
+    current_data = doc.to_dict()
+    current_data.update(data)
+    
+    try:
+        # Validate the updated data
+        updated_customer = CustomerModel(**current_data)
+        
+        # Update the document with validated data
+        doc_ref.update(updated_customer.to_dict())
+        
+        # Return updated customer with ID
+        response_data = updated_customer.to_dict()
+        response_data['id'] = doc.id
+        return jsonify(response_data), 200
+        
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
+
+# DELETE a customer by document ID.
+@app.route('/customers/<customer_id>', methods=['DELETE'])
+def delete_customer(customer_id):
+    doc_ref = db.collection('customers').document(customer_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        abort(404, description="Customer not found")
+    
+    doc_ref.delete()
     return jsonify({"message": f"Customer {customer_id} deleted"}), 200
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)

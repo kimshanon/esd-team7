@@ -1,0 +1,65 @@
+services:
+  customer-service:
+    build:
+      context: .
+      dockerfile: ./atomic/Dockerfile.customer
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env.docker
+    volumes:
+      - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
+    networks:
+      - esd-network
+      
+  picker-service:
+    build:
+      context: .
+      dockerfile: ./atomic/Dockerfile.picker
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env.docker
+    volumes:
+      - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
+    networks:
+      - esd-network
+
+  stall-service:
+    build:
+      context: .
+      dockerfile: ./atomic/Dockerfile.stall
+    ports:
+      - "5002:5002"
+    env_file:
+      - .env.docker
+    volumes:
+      - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
+    networks:
+      - esd-network
+      
+  order-service:
+    build:
+      context: .
+      dockerfile: ./atomic/Dockerfile.order
+    ports:
+      - "5003:5003"
+    env_file:
+      - .env.docker
+    volumes:
+      - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
+    networks:
+      - esd-network
+      
+  # Add RabbitMQ for messaging between services
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - esd-network
+
+networks:
+  esd-network:
+    driver: bridge

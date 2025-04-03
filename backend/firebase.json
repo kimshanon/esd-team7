@@ -1,0 +1,24 @@
+{
+    "projects": {
+        "default": "your-firebase-project-id"
+    },
+    "firestore": {
+        "rules": "firestore.rules"
+    },
+    "hosting": {
+        "public": "frontend/dist",
+        "rewrites": [
+            {
+                "source": "/api/picker/**",
+                "function": "pickerService"
+            },
+            {
+                "source": "/api/customer/**",
+                "function": "customerService"
+            }
+        ]
+    },
+    "functions": {
+        "source": "backend/functions"
+    }
+}
