@@ -30,48 +30,41 @@ def create_order():
     data = request.get_json()
     
     # Required fields
-    customer_id = data.get("customer_id")
-    stall_id = data.get("stall_id")
-    customer_id = data.get("customer_id")
-    stall_id = data.get("stall_id")
+    customer_id = data.get("customerID")
+    stall_id = data.get("stallID")
     location = data.get("location")
+    payment = data.get("payment")
 
     # Optional fields
+    additional_request = data.get("additionalRequest", "")
     credit = data.get("credit", 0.0)  # Default credit used is 0
     picker_id = None  # Initially, no picker is assigned
     order_status = "Active"  # Default order status
 
-    if not customer_id or not stall_id or not location:
-        return jsonify({"code": 400, "message": "customer_id, stall_id and location are required"}), 400
-    # Validate required fields
-    if not customer_id or not stall_id or not location:
-        return jsonify({"code": 400, "message": "customer_id, stall_id, location are required"}), 400
+    if not customer_id or not stall_id or not location or not payment:
+        return jsonify({"code": 400, "message": "customerID, stallID, location, and payment are required"}), 400
 
     order_id = str(uuid.uuid4())  # Generate a unique order ID
 
     # Construct the order data (no 'title', 'position' replaced with 'coordinates')
     order_data = {
-        "customer_id": customer_id,
-        "picker_id": picker_id,  # Initially no picker is assigned
-        "stall_id": stall_id,
-        "location": {
-            "address": location.get("address"),  # Retaining address
-            "coordinates": location.get("coordinates"),  # Replacing position with coordinates
-            "postal": location.get("postal"),  # Retaining postal code
-        },
+        "customerID": customer_id,
+        "pickerID": picker_id,  
+        "stallID": stall_id,
+        "additionalRequest": additional_request,
+        "timestamp": datetime.utcnow().isoformat(),
+        "location": location,
         "credit": credit,
-        "order_status": order_status  # Set the initial order status to "Active"
+        "payment": payment,
+        "status": "Pending"
     }
 
     # Save to Firestore
     db.collection("orders").document(order_id).set(order_data)
 
-    return jsonify({"code": 201, "message": "Order created successfully", "order_id": order_id}), 201
+    return jsonify({"code": 201, "message": "Order created successfully", "orderID": order_id}), 201
 
-
-
-
-# ✅ Get all orders by customer ID, default to 'QbJTSeLiZsbL509BxpY8'
+# ✅ Get all orders of a speicifc picker 
 @app.route("/orders", methods=['GET'])
 def get_all_orders():
     customer_id = request.args.get('customer_id', default='QbJTSeLiZsbL509BxpY8')  # Default customer ID
@@ -135,21 +128,6 @@ def update_location(order_id):
     order_ref.update({"location": new_location})
     
     return jsonify({"code": 200, "message": f"Order {orderID} location updated successfully"}), 200
-
-
-# ✅ Update an order status to "Cancelled"
-@app.route("/orders/<orderID>/cancel", methods=['PATCH'])
-def cancel_order(orderID):
-    order_ref = db.collection("orders").document(orderID)
-    order = order_ref.get()
-
-    if not order.exists:
-        return jsonify({"code": 404, "message": "Order not found"}), 404
-
-    order_ref.update({"status": "Cancelled"})
-    
-    return jsonify({"code": 200, "message": f"Order {orderID} has been cancelled successfully"}), 200
-
 
 
 # #assign a picker
