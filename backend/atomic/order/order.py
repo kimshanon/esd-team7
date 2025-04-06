@@ -26,37 +26,35 @@ def create_order():
     data = request.get_json()
     
     # Required fields
-    customer_id = data.get("customerID")
-    stall_id = data.get("stallID")
+    customer_id = data.get("customer_id")
+    stall_id = data.get("stall_id")
     location = data.get("location")
-    payment = data.get("payment")
 
     # Optional fields
-    additional_request = data.get("additionalRequest", "")
     credit = data.get("credit", 0.0)  # Default credit used is 0
     picker_id = None  # Initially, no picker is assigned
 
-    if not customer_id or not stall_id or not location or not payment:
-        return jsonify({"code": 400, "message": "customerID, stallID, location, and payment are required"}), 400
+    if not customer_id or not stall_id or not location:
+        return jsonify({"code": 400, "message": "customer_id, stall_id and location are required"}), 400
 
     order_id = str(uuid.uuid4())  # Generate a unique order ID
     order_data = {
-        "customerID": customer_id,
-        "pickerID": picker_id,  
-        "stallID": stall_id,
-        "additionalRequest": additional_request,
-        "timestamp": datetime.utcnow().isoformat(),
+        "customer_id": customer_id,
+        "picker_id": picker_id,  
+        # "order_id": order_id,
+        "stall_id": stall_id,
+        # "additionalRequest": additional_request,
+        # "timestamp": datetime.utcnow().isoformat(),
         "location": location,
         "credit": credit,
-        "payment": payment,
-        "status": "Pending"
+        "order_status": "Pending"
     }
 
     db.collection("orders").document(order_id).set(order_data)
 
-    return jsonify({"code": 201, "message": "Order created successfully", "orderID": order_id}), 201
+    return jsonify({"code": 201, "message": "Order created successfully", "order_id": order_id}), 201
 
-# ✅ Get all orders of a speicifc picker 
+# ✅ Get all orders of a specifc picker 
 @app.route("/orders", methods=['GET'])
 def get_all_orders():
     picker_id = request.args.get('pickerID')  # Get pickerID from query parameters
@@ -119,6 +117,21 @@ def update_location(orderID):
     return jsonify({"code": 200, "message": f"Order {orderID} location updated successfully"}), 200
 
 
+# ✅ Update an order status to "Cancelled"
+@app.route("/orders/<orderID>/cancel", methods=['PATCH'])
+def cancel_order(orderID):
+    order_ref = db.collection("orders").document(orderID)
+    order = order_ref.get()
+
+    if not order.exists:
+        return jsonify({"code": 404, "message": "Order not found"}), 404
+
+    order_ref.update({"status": "Cancelled"})
+    
+    return jsonify({"code": 200, "message": f"Order {orderID} has been cancelled successfully"}), 200
+
+
+
 # #assign a picker
 # @app.route("/orders/<orderID>/assign", methods=['PATCH'])
 # def assign_picker(orderID):
@@ -142,4 +155,4 @@ def update_location(orderID):
 
 # ✅ Start the Flask app
 if __name__ == "__main__":
-    app.run(port=5001, debug=True)
+    app.run(port=5003, debug=True)
