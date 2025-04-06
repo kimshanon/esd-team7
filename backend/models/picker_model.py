@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 
 class PickerModel(BaseModel):
+    firebase_uid: str = Field(..., min_length=1)
     picker_name: str = Field(..., min_length=1)
     picker_email: EmailStr
     picker_phone: int

@@ -39,7 +39,7 @@ def get_pickers():
 
 # GET all Available pickers.
 @app.route('/pickers/available', methods=['GET'])
-def get_pickers():
+def get_available_pickers():
     pickers_ref = db.collection('pickers').where("is_available", "==", True)
     docs = pickers_ref.stream()
     pickers = []
@@ -49,7 +49,7 @@ def get_pickers():
         pickers.append(picker)
     return jsonify(pickers), 200
 
-# GET a specific picker by document ID.
+# GET a specific picker by document ID (which is now the Firebase UID).
 @app.route('/pickers/<picker_id>', methods=['GET'])
 def get_picker(picker_id):
     doc_ref = db.collection('pickers').document(picker_id)
@@ -67,17 +67,27 @@ def create_picker():
     if not data:
         abort(400, description="Missing request body")
     
+    # Check if firebase_uid is provided
+    if 'firebase_uid' not in data:
+        abort(400, description="firebase_uid is required")
+    
+    firebase_uid = data['firebase_uid']
+    
+    # Check if picker already exists with this firebase_uid
+    doc_ref = db.collection('pickers').document(firebase_uid)
+    if doc_ref.get().exists:
+        abort(409, description="Picker with this Firebase UID already exists")
+    
     try:
         # Validate picker data using Pydantic model
         picker_model = PickerModel(**data)
         
-        # Add a new document to the "pickers" collection.
-        doc_ref = db.collection('pickers').document()
+        # Use the firebase_uid as the document ID
         doc_ref.set(picker_model.to_dict())
         
         # Return the new picker with its ID
         new_picker = picker_model.to_dict()
-        new_picker['id'] = doc_ref.id
+        new_picker['id'] = firebase_uid
         return jsonify(new_picker), 201
         
     except ValidationError as e:
@@ -94,6 +104,10 @@ def update_picker(picker_id):
     data = request.get_json()
     if not data:
         abort(400, description="Missing request body")
+    
+    # Don't allow changing firebase_uid
+    if 'firebase_uid' in data and data['firebase_uid'] != picker_id:
+        abort(400, description="Cannot change firebase_uid")
     
     try:
         # Get current data and update with new data

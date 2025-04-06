@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 
 class CustomerModel(BaseModel):
+    firebase_uid: str = Field(..., min_length=1)
     customer_name: str = Field(..., min_length=1)
     customer_email: EmailStr
     customer_phone: int

@@ -5,6 +5,9 @@ class MenuItemModel(BaseModel):
     food_name: str = Field(..., min_length=1)
     food_price: float = Field(..., gt=0)
     food_description: Optional[str] = None
+    food_image: Optional[str] = None
+    food_category: str
+    
     
     def to_dict(self):
         """Convert model to dictionary for Firestore storage"""
@@ -17,7 +20,16 @@ class MenuItemModel(BaseModel):
 
 class StallModel(BaseModel):
     stall_name: str = Field(..., min_length=1)
+    stall_image: str = Field(..., min_length=1)
+    stall_cover_image: Optional[str] = None
+    stall_description: Optional[str] = None
+    rating: float = Field(..., gt=0)
+    review_count: int
+    cuisines: Optional[List[str]]
+    preparation_time_mins: int
+    delivery_fee: float = Field(..., gt=0)
     stall_location: str = Field(..., min_length=1)
+    is_promoted: bool
     menu: Optional[List[MenuItemModel]] = []
     
     def to_dict(self):

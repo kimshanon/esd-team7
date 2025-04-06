@@ -33,7 +33,7 @@ def get_customers():
         customers.append(data)
     return jsonify(customers), 200
 
-# GET a specific customer by document ID.
+# GET a specific customer by document ID (which is now the Firebase UID).
 @app.route('/customers/<customer_id>', methods=['GET'])
 def get_customer(customer_id):
     doc_ref = db.collection('customers').document(customer_id)
@@ -51,17 +51,27 @@ def create_customer():
     if not data:
         abort(400, description="Missing request body")
     
+    # Check if firebase_uid is provided
+    if 'firebase_uid' not in data:
+        abort(400, description="firebase_uid is required")
+    
+    firebase_uid = data['firebase_uid']
+    
+    # Check if customer already exists with this firebase_uid
+    doc_ref = db.collection('customers').document(firebase_uid)
+    if doc_ref.get().exists:
+        abort(409, description="Customer with this Firebase UID already exists")
+    
     try:
         # Validate data using Pydantic model
         customer_data = CustomerModel(**data)
         
-        # Add a new document; Firestore will generate a unique document ID.
-        doc_ref = db.collection('customers').document()
+        # Use the firebase_uid as the document ID
         doc_ref.set(customer_data.to_dict())
         
         # Return the new customer with its ID
         new_customer = customer_data.to_dict()
-        new_customer['id'] = doc_ref.id
+        new_customer['id'] = firebase_uid
         return jsonify(new_customer), 201
         
     except ValidationError as e:
@@ -81,6 +91,11 @@ def update_customer(customer_id):
     
     # Get current data and update with new data
     current_data = doc.to_dict()
+    
+    # Don't allow changing firebase_uid
+    if 'firebase_uid' in data and data['firebase_uid'] != customer_id:
+        abort(400, description="Cannot change firebase_uid")
+    
     current_data.update(data)
     
     try:
