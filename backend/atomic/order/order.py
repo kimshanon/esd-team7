@@ -1,3 +1,5 @@
+#order.py
+import requests
 import firebase_admin
 from firebase_admin import credentials, firestore
 import uuid
@@ -11,6 +13,8 @@ app = Flask(__name__)
 # Allow all origins (For development only, restrict in production)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+PAYMENT_SERVICE_URL = "http://localhost:5007/payment"
+
 # Initialize Firebase Admin SDK only if not already initialized
 if not firebase_admin._apps:
     cred = credentials.Certificate("./firebase-adminsdk.json")  # Replace with your Firebase JSON key file
@@ -23,46 +27,94 @@ db = firestore.client()
 def home():
     return "Order & Picker Microservice (Using Firebase Firestore)"
 
-
 # ✅ Create a new order
 @app.route("/orders", methods=['POST'])
 def create_order():
     data = request.get_json()
     
     # Required fields
-    customer_id = data.get("customerID")
-    stall_id = data.get("stallID")
+    item_id = data.get("item_id")
+    item_name = data.get("item_name")
+    customer_id = data.get("customer_id", "QbJTSeLiZsbL509BxpY8")  # Default customer ID
+    stall_id = data.get("stall_id")
+    stall_name = data.get("stall_name")
     location = data.get("location")
-    payment = data.get("payment")
-
-    # Optional fields
-    additional_request = data.get("additionalRequest", "")
     credit = data.get("credit", 0.0)  # Default credit used is 0
-    picker_id = None  # Initially, no picker is assigned
-    order_status = "Active"  # Default order status
+    ordered_at = datetime.utcnow()
 
-    if not customer_id or not stall_id or not location or not payment:
-        return jsonify({"code": 400, "message": "customerID, stallID, location, and payment are required"}), 400
-
-    order_id = str(uuid.uuid4())  # Generate a unique order ID
-
-    # Construct the order data (no 'title', 'position' replaced with 'coordinates')
+    print(f"Location received: {location}")
+    
+    # Set default values
+    picker_id = ""  # Initially empty string
+    order_status = "Active"  # Default status
+    
+    # Validate required fields
+    if not customer_id or not stall_id or not location:
+        return jsonify({"code": 400, "message": "customer_id, stall_id, and location are required"}), 400
+    
+    # Generate a unique order ID
+    order_id = str(uuid.uuid4())
+    
+    # Construct the order data with properly formatted location
     order_data = {
-        "customerID": customer_id,
-        "pickerID": picker_id,  
-        "stallID": stall_id,
-        "additionalRequest": additional_request,
-        "timestamp": datetime.utcnow().isoformat(),
-        "location": location,
-        "credit": credit,
-        "payment": payment,
-        "status": "Pending"
+        "item_id" : item_id,
+        "item_name" : item_name,
+        "customer_id": customer_id,
+        "picker_id": picker_id,
+        "stall_id": stall_id,
+        "stall_name" : stall_name,
+        "ordered_at" : ordered_at,
+        "location": {
+            "address": location.get("title", ""),  # Use title as address
+            "coordinates": {
+                "lat": location.get("coordinates", {}).get("lat", 0),
+                "lng": location.get("coordinates", {}).get("lng", 0)
+            },
+            "postal": location.get("postal", "")
+        },
+        "credit": float(credit),  # Ensure credit is stored as a number
+        "order_status": order_status
     }
-
+    
     # Save to Firestore
     db.collection("orders").document(order_id).set(order_data)
+    current_timestamp = current_timestamp = datetime.utcnow().isoformat()
 
-    return jsonify({"code": 201, "message": "Order created successfully", "orderID": order_id}), 201
+    payment_data = {
+        "log_id": str(uuid.uuid4()),  # Example log_id
+        "customer_id" : customer_id,
+        "order_id": order_id,
+        "payment_amount" : credit,
+        "event_type": "Payment",
+        "event_details": f"Payment for order {order_id}",
+        "payment_status": "Pending",  # Default status
+        "timestamp": current_timestamp
+    }
+
+    print("Sending payment data:", payment_data)  # Log the payment data for debugging
+
+    try:
+        payment_response = requests.post(PAYMENT_SERVICE_URL, json=payment_data)
+        print(f"Payment response status: {payment_response.status_code}")
+        print(f"Payment response text: {payment_response.text}") 
+        if payment_response.status_code == 201:
+            payment_id = payment_response.json().get('data').get('payment_id')
+            return jsonify({
+                "code": 201,
+                "message": "Order and payment created successfully",
+                "order_id": order_id,
+                "payment_id": payment_id
+            }), 201
+        else:
+            return jsonify({
+                "code": 500,
+                "message": "Failed to create payment in Payment Microservice"
+            }), 500
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "code": 500,
+            "message": f"Error calling Payment Microservice: {str(e)}"
+        }), 500
 
 # ✅ Get all orders of a speicifc picker 
 @app.route("/orders", methods=['GET'])
@@ -101,6 +153,7 @@ def get_order(order_id):
 #         return jsonify({"code": 404, "message": f"Picker {picker_id} not found."}), 404
 
 # ✅ Update Order Location
+    
 @app.route("/orders/<order_id>/location", methods=['PATCH'])
 def update_location(order_id):
     data = request.get_json()
@@ -149,6 +202,21 @@ def update_location(order_id):
 #     order_ref.update({"pickerID": picker_id, "status": "Assigned"})
     
 #     return jsonify({"code": 200, "message": f"Picker {picker_id} assigned to order {orderID}"}), 200
+
+# Update order status
+@app.route("/orders/<order_id>/status", methods=['PATCH'])
+def update_order_status(order_id):
+    data = request.get_json()
+    if not data or 'order_status' not in data:
+        return jsonify({"code": 400, "message": "Missing 'order_status' field"}), 400
+
+    valid_statuses = ["Active", "Completed", "Cancelled"]
+    if data['order_status'] not in valid_statuses:
+        return jsonify({"code": 400, "message": "Invalid status"}), 400
+
+    order_ref = db.collection('orders').document(order_id)
+    order_ref.update({'order_status': data['order_status']})
+    return jsonify({"code": 200, "message": "Order status updated"}), 200
 
 
 # ✅ Start the Flask app
