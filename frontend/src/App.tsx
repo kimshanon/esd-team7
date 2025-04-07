@@ -1,0 +1,91 @@
+import { useEffect } from "react";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/Register";
+import Layout from "./components/Layout";
+import RestaurantsPage from "./pages/RestaurantsPage";
+import RestaurantDetailPage from "./pages/RestaurantDetailPage";
+import CartPage from "./pages/CartPage";
+import OrdersPage from "./pages/OrdersPage";
+import OrderTrackingPage from "./pages/OrderTrackingPage";
+import NotFoundPage from "./pages/NotFoundPage";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import PickerLayout from "./components/PickerLayout";
+import PickerDashboard from "./pages/picker/PickerDashboard";
+import { useAppSelector } from "./redux/hooks";
+
+function App() {
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check if user is a picker and redirect if needed
+    if (
+      isAuthenticated &&
+      user?.userType === "picker" &&
+      !location.pathname.startsWith("/picker") &&
+      location.pathname !== "/login" &&
+      location.pathname !== "/register"
+    ) {
+      navigate("/picker/dashboard");
+    }
+  }, [isAuthenticated, user, location.pathname, navigate]);
+
+  // If user is a picker, show picker routes
+  if (isAuthenticated && user?.userType === "picker") {
+    return (
+      <Routes>
+        <Route path="/*" element={<PickerLayout />}>
+          <Route index element={<PickerDashboard />} />
+          <Route path="picker/dashboard" element={<PickerDashboard />} />
+          <Route path="picker/active-order" element={<PickerDashboard />} />
+          <Route path="picker/history" element={<PickerDashboard />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+    );
+  }
+
+  // Otherwise show regular customer routes (including auth routes with customer Layout)
+  return (
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        {/* Auth routes now use the same Layout as customer routes */}
+        <Route path="login" element={<LoginPage />} />
+        <Route path="register" element={<RegisterPage />} />
+
+        {/* Regular customer routes */}
+        <Route index element={<RestaurantsPage />} />
+        <Route path="restaurants/:id" element={<RestaurantDetailPage />} />
+        <Route
+          path="cart"
+          element={
+            <ProtectedRoute>
+              <CartPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="orders"
+          element={
+            <ProtectedRoute>
+              <OrdersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="orders/:orderId"
+          element={
+            <ProtectedRoute>
+              <OrderTrackingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
+  );
+}
+
+export default App;
