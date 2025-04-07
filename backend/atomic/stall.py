@@ -21,6 +21,10 @@ db = firestore.client()
 app = Flask(__name__)
 CORS(app)
 
+# TEST
+@app.route('/test', methods=['GET'])
+def test():
+    return "Stall MS is running"
 
 # GET all food stalls with their menus.
 @app.route("/stalls", methods=["GET"])

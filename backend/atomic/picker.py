@@ -25,6 +25,11 @@ db = firestore.client()
 app = Flask(__name__)
 CORS(app)
 
+# TEST
+@app.route('/test', methods=['GET'])
+def test():
+    return "Picker MS is running"
+
 # GET all pickers.
 @app.route('/pickers', methods=['GET'])
 def get_pickers():

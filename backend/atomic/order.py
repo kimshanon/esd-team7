@@ -28,6 +28,11 @@ db = firestore.client()
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
+# TEST
+@app.route('/test', methods=['GET'])
+def test():
+    return "Order MS is running"
+
 # GET all orders (including their order items)
 @app.route('/orders', methods=['GET'])
 def get_orders():
