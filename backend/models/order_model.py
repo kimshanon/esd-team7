@@ -9,6 +9,7 @@ class OrderStatus(str, Enum):
     preparing = "preparing"
     delivering = "delivering"
     completed = "completed"
+    cancelled = "cancelled"
 
 class OrderItemModel(BaseModel):
     order_item: str = Field(..., min_length=1)
