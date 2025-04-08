@@ -4,28 +4,30 @@ import { Stall, Restaurant, MenuItem, MenuItemFrontend } from "../types/types";
 const API_URL = "http://127.0.0.1:5002";
 const ORDER_API_URL = "http://127.0.0.1:5003";
 
+
+
 // Map backend stall data to frontend restaurant format
 export const mapStallToRestaurant = (stall: Stall): Restaurant => {
   return {
-    id: stall.id,
+    id: stall.stall_id.toString(),
     name: stall.stall_name,
-    image: stall.stall_image,
+    image: stall.stall_image || "", // Use empty string if no image is provided
     description: stall.stall_description,
-    rating: stall.rating,
+    rating: stall.stall_rating,
     reviewCount: stall.review_count,
-    cuisines: stall.cuisines,
+    cuisines: [], // You might want to add this data if available
     deliveryTime: stall.preparation_time_mins,
     deliveryFee: stall.delivery_fee,
     location: stall.stall_location,
     isPromoted: stall.is_promoted,
-    menu: stall.menu.map(mapMenuItemToFrontend),
+    menu: [], // You might want to fetch this separately
   };
 };
 
 // Map backend menu item to frontend format
 export const mapMenuItemToFrontend = (item: MenuItem): MenuItemFrontend => {
   return {
-    id: item.id,
+    id: item.menu_item_id.toString(),
     name: item.food_name,
     price: item.food_price,
     description: item.food_description,
@@ -34,11 +36,19 @@ export const mapMenuItemToFrontend = (item: MenuItem): MenuItemFrontend => {
   };
 };
 
+interface StallResponse {
+  FoodStalls: Stall[];
+}
+
+interface MenuResponse {
+  StallItems: MenuItem[];
+}
+
 // Fetch all restaurants
 export const fetchAllRestaurants = async (): Promise<Restaurant[]> => {
   try {
-    const response = await axios.get<Stall[]>(`${API_URL}/stalls`);
-    return response.data.map(mapStallToRestaurant);
+    const response = await axios.get<StallResponse>(`https://personal-dcwqxa6n.outsystemscloud.com/SMUlivery/rest/FoodStallAPI/GetAllStalls`);
+    return response.data["FoodStalls"].map(mapStallToRestaurant);
   } catch (error) {
     console.error("Error fetching restaurants:", error);
     throw error;
@@ -48,8 +58,24 @@ export const fetchAllRestaurants = async (): Promise<Restaurant[]> => {
 // Fetch a single restaurant by ID
 export const fetchRestaurantById = async (id: string): Promise<Restaurant> => {
   try {
-    const response = await axios.get<Stall>(`${API_URL}/stalls/${id}`);
-    return mapStallToRestaurant(response.data);
+    // Fetch both restaurant and menu data
+    const [stallResponse, menuResponse] = await Promise.all([
+      axios.get<StallResponse>(`https://personal-dcwqxa6n.outsystemscloud.com/SMUlivery/rest/FoodStallAPI/GetAllStalls`),
+      axios.get<MenuResponse>(`https://personal-dcwqxa6n.outsystemscloud.com/SMUlivery/rest/FoodStallAPI/GetAllFoodFromStall/${id}`)
+    ]);
+
+    // Find the specific stall from the response
+    const stall = stallResponse.data.FoodStalls.find(s => s.stall_id.toString() === id);
+    
+    if (!stall) {
+      throw new Error(`Restaurant with ID ${id} not found`);
+    }
+
+    // Convert stall to restaurant format and include menu
+    const restaurant = mapStallToRestaurant(stall);
+    restaurant.menu = menuResponse.data.StallItems.map(mapMenuItemToFrontend);
+
+    return restaurant;
   } catch (error) {
     console.error(`Error fetching restaurant with ID ${id}:`, error);
     throw error;
@@ -61,10 +87,10 @@ export const fetchRestaurantMenu = async (
   id: string
 ): Promise<MenuItemFrontend[]> => {
   try {
-    const response = await axios.get<MenuItem[]>(
-      `${API_URL}/stalls/${id}/menu`
+    const response = await axios.get<MenuResponse>(
+      `https://personal-dcwqxa6n.outsystemscloud.com/SMUlivery/rest/FoodStallAPI/GetAllFoodFromStall/${id}`
     );
-    return response.data.map(mapMenuItemToFrontend);
+    return response.data.StallItems.map(mapMenuItemToFrontend);
   } catch (error) {
     console.error(`Error fetching menu for restaurant ${id}:`, error);
     throw error;
