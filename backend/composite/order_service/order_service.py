@@ -167,77 +167,6 @@ def create_order():
             "data": None
         }), 500
 
-@app.route("/api/v1/orders/<order_id>/location", methods=["PATCH"])
-def update_order_location(order_id):
-    """Update order delivery location"""
-    try:
-        new_location = request.get_json().get("location")
-        if not new_location:
-            return jsonify({
-                "code": 400,
-                "message": "New location is required",
-                "data": None
-            }), 400
-
-        # Check if order exists and is not completed
-        order_response = requests.get(f"{ORDER_SERVICE_URL}/api/v1/orders/{order_id}")
-        if order_response.status_code != 200:
-            return jsonify({
-                "code": 404,
-                "message": "Order not found",
-                "data": None
-            }), 404
-
-        order_data = order_response.json().get("data", {})
-        if order_data.get("order_status") == "Completed":
-            return jsonify({
-                "code": 400,
-                "message": "Cannot update location of completed order",
-                "data": None
-            }), 400
-
-        # Update location
-        update_response = requests.patch(
-            f"{ORDER_SERVICE_URL}/api/v1/orders/{order_id}/location",
-            json={"location": new_location}
-        )
-
-        if update_response.status_code != 200:
-            return jsonify({
-                "code": update_response.status_code,
-                "message": "Failed to update location",
-                "data": None
-            }), update_response.status_code
-
-        # Notify picker of location change
-        picker_id = order_data.get("picker_id")
-        if picker_id:
-            socketio.emit(
-                "location_updated",
-                {
-                    "order_id": order_id,
-                    "new_location": new_location
-                },
-                room=f"picker_{picker_id}"
-            )
-
-        return jsonify({
-            "code": 200,
-            "message": "Location updated successfully",
-            "data": {
-                "order_id": order_id,
-                "new_location": new_location
-            }
-        }), 200
-
-    except Exception as e:
-        print(f"Error updating location: {str(e)}")
-        return jsonify({
-            "code": 500,
-            "message": f"Failed to update location: {str(e)}",
-            "data": None
-        }), 500
-
 @app.route("/api/v1/orders/<order_id>/complete", methods=["POST"])
 def complete_order(order_id):
     """Mark order as completed and credit picker"""
@@ -420,7 +349,7 @@ def handle_picker_cancelled(message):
         }, room="pickers")
 
 def handle_location_update(message):
-    """Handle order location updates"""
+    """Handle order location updates - only notify picker"""
     order_id = message.get("order_id")
     new_location = message.get("new_location")
     
@@ -428,28 +357,26 @@ def handle_location_update(message):
         print("Invalid location_update message format")
         return
     
-    # Update order location
     try:
-        response = requests.patch(
-            f"{ORDER_SERVICE_URL}/api/v1/orders/{order_id}/location",
-            json={"location": new_location}
-        )
-        
-        if response.status_code != 200:
-            print(f"Failed to update location: {response.text}")
+        # Get order details to find picker
+        order_response = requests.get(f"{ORDER_SERVICE_URL}/api/v1/orders/{order_id}")
+        if order_response.status_code != 200:
+            print(f"Failed to get order details: {order_response.text}")
             return
         
-        # Notify picker of location change
-        order_data = response.json().get("data", {})
+        order_data = order_response.json().get("data", {})
         picker_id = order_data.get("picker_id")
+        
         if picker_id:
+            # Notify picker of location change
             socketio.emit("location_updated", {
                 "order_id": order_id,
                 "new_location": new_location
             }, room=f"picker_{picker_id}")
+            print(f"Notified picker {picker_id} of location update for order {order_id}")
             
     except Exception as e:
-        print(f"Error updating location: {str(e)}")
+        print(f"Error handling location update notification: {str(e)}")
 
 def handle_order_completed(message):
     """Handle order completion and notify relevant parties"""
