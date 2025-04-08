@@ -14,6 +14,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import PickerLayout from "./components/PickerLayout";
 import PickerDashboard from "./pages/picker/PickerDashboard";
 import { useAppSelector } from "./redux/hooks";
+import ProfilePage from "./pages/ProfilePage";
 
 function App() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
@@ -81,6 +82,14 @@ function App() {
           element={
             <ProtectedRoute>
               <OrderTrackingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           }
         />

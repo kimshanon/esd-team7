@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, abort
+from flask import Flask, request, jsonify, abort, make_response
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
@@ -19,14 +19,21 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+# Enable CORS for the specific frontend origin
+CORS(app)
 
-# TEST
+# Handle OPTIONS pre-flight CORS request
+@app.route('/<path:path>', methods=['OPTIONS'])
+@app.route('/', methods=['OPTIONS'])
+def options_handler(path=None):
+    return make_response('', 200)
+
+# TEST endpoint
 @app.route('/test', methods=['GET'])
 def test():
     return "Customer MS is running"
 
-# GET all customers.
+# GET all customers
 @app.route('/customers', methods=['GET'])
 def get_customers():
     customers_ref = db.collection('customers')
@@ -38,7 +45,7 @@ def get_customers():
         customers.append(data)
     return jsonify(customers), 200
 
-# GET a specific customer by document ID (which is now the Firebase UID).
+# GET a specific customer by document ID
 @app.route('/customers/<customer_id>', methods=['GET'])
 def get_customer(customer_id):
     doc_ref = db.collection('customers').document(customer_id)
@@ -49,7 +56,7 @@ def get_customer(customer_id):
     customer['id'] = doc.id
     return jsonify(customer), 200
 
-# POST a new customer.
+# POST a new customer
 @app.route('/customers', methods=['POST'])
 def create_customer():
     data = request.get_json()
@@ -82,7 +89,7 @@ def create_customer():
     except ValidationError as e:
         return jsonify({"error": str(e)}), 400
 
-# PUT update an existing customer.
+# PUT update an existing customer
 @app.route('/customers/<customer_id>', methods=['PUT'])
 def update_customer(customer_id):
     data = request.json
@@ -118,7 +125,7 @@ def update_customer(customer_id):
     except ValidationError as e:
         return jsonify({"error": str(e)}), 400
 
-# DELETE a customer by document ID.
+# DELETE a customer by document ID
 @app.route('/customers/<customer_id>', methods=['DELETE'])
 def delete_customer(customer_id):
     doc_ref = db.collection('customers').document(customer_id)
@@ -128,6 +135,88 @@ def delete_customer(customer_id):
     
     doc_ref.delete()
     return jsonify({"message": f"Customer {customer_id} deleted"}), 200
+
+
+# Add credits to a customer account
+@app.route('/customers/<customer_id>/add-credits', methods=['POST', 'OPTIONS'])
+def add_customer_credits(customer_id):
+    if request.method == 'OPTIONS':
+        return make_response('', 200)
+
+    data = request.json
+    if not data or 'amount' not in data:
+        abort(400, description="Missing amount in request body")
+    
+    # Validate amount is a positive number
+    try:
+        amount = float(data['amount'])
+        if amount <= 0:
+            abort(400, description="Amount must be greater than zero")
+    except ValueError:
+        abort(400, description="Amount must be a valid number")
+    
+    doc_ref = db.collection('customers').document(customer_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        abort(404, description="Customer not found")
+    
+    # Get current data
+    current_data = doc.to_dict()
+    current_credits = current_data.get('customer_credits', 0)
+    
+    # Update credits
+    new_credits = current_credits + amount
+    
+    # Update the document with new credits
+    doc_ref.update({'customer_credits': new_credits})
+    
+    # Return updated credits
+    return jsonify({
+        'previous_credits': current_credits,
+        'added_amount': amount,
+        'new_credits': new_credits
+    }), 200
+
+@app.route('/customers/<customer_id>/deduct-credits', methods=['POST'])
+def deduct_customer_credits(customer_id):
+    data = request.json
+    if not data or 'amount' not in data:
+        abort(400, description="Missing amount in request body")
+    
+    # Validate amount is a positive number
+    try:
+        amount = float(data['amount'])
+        if amount <= 0:
+            abort(400, description="Amount must be greater than zero")
+    except ValueError:
+        abort(400, description="Amount must be a valid number")
+    
+    doc_ref = db.collection('customers').document(customer_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        abort(404, description="Customer not found")
+    
+    # Get current data
+    current_data = doc.to_dict()
+    current_credits = current_data.get('customer_credits', 0)
+    
+    # Check if customer has enough credits
+    if current_credits < amount:
+        abort(400, description="Insufficient credits")
+    
+    # Update credits
+    new_credits = current_credits - amount
+    
+    # Update the document with new credits
+    doc_ref.update({'customer_credits': new_credits})
+    
+    # Return updated credits
+    return jsonify({
+        'previous_credits': current_credits,
+        'deducted_amount': amount,
+        'new_credits': new_credits
+    }), 200
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)

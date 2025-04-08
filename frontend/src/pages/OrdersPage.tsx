@@ -1,28 +1,19 @@
-import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import {
-  ShoppingBag,
-  Clock,
-  Package,
-  ArrowRight,
-  Calendar,
-} from "lucide-react";
-import axios from "axios";
-import { format } from "date-fns";
-import { useAppSelector } from "@/redux/hooks";
-import { toast } from "sonner";
+"use client"
 
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useState, useEffect } from "react"
+import { useNavigate, Link } from "react-router-dom"
+import { ShoppingBag, Package, ArrowRight, Calendar, MapPin, Edit } from "lucide-react"
+import axios from "axios"
+import { format } from "date-fns"
+import { useAppSelector } from "@/redux/hooks"
+import { toast } from "sonner"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import ChangeLocationModal from "@/components/ChangeLocationModal"
 
 // Order status mapping for UI display
 const orderStatusMap = {
@@ -32,83 +23,94 @@ const orderStatusMap = {
   delivering: { label: "Out for Delivery", color: "bg-indigo-500" },
   completed: { label: "Delivered", color: "bg-green-500" },
   cancelled: { label: "Cancelled", color: "bg-red-500" },
-};
+}
 
 // UI badge component for order status
 function OrderStatusBadge({ status }: { status: string }) {
   const statusInfo = orderStatusMap[status as keyof typeof orderStatusMap] || {
     label: status,
     color: "bg-gray-500",
-  };
+  }
 
-  return (
-    <Badge className={`${statusInfo.color} text-white`}>
-      {statusInfo.label}
-    </Badge>
-  );
+  return <Badge className={`${statusInfo.color} text-white`}>{statusInfo.label}</Badge>
 }
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
-  const navigate = useNavigate();
+  const [orders, setOrders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth)
+  const navigate = useNavigate()
+  const [selectedOrderForLocation, setSelectedOrderForLocation] = useState<{ id: string; location: string } | null>(
+    null,
+  )
 
   useEffect(() => {
     // Redirect to login if not authenticated
     if (!isAuthenticated) {
-      navigate("/login", { state: { from: "/orders" } });
-      return;
+      navigate("/login", { state: { from: "/orders" } })
+      return
     }
 
     async function fetchOrders() {
       try {
-        setLoading(true);
-        const response = await axios.get(
-          `http://127.0.0.1:5003/customers/${user?.id}/orders`
-        );
+        setLoading(true)
+        const response = await axios.get(`http://127.0.0.1:5003/customers/${user?.id}/orders`)
 
         // Sort orders by date (newest first)
         const sortedOrders = response.data.sort((a: any, b: any) => {
-          return (
-            new Date(b.order_start).getTime() -
-            new Date(a.order_start).getTime()
-          );
-        });
+          return new Date(b.order_start).getTime() - new Date(a.order_start).getTime()
+        })
 
-        setOrders(sortedOrders);
+        setOrders(sortedOrders)
       } catch (error) {
-        console.error("Error fetching orders:", error);
+        console.error("Error fetching orders:", error)
         toast.error("Failed to load orders", {
           description: "Please try again later",
-        });
+        })
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     }
 
     if (user?.id) {
-      fetchOrders();
+      fetchOrders()
     }
-  }, [user?.id, isAuthenticated, navigate]);
+  }, [user?.id, isAuthenticated, navigate])
 
   // Calculate total cost of an order
   const calculateTotal = (items: any[]) => {
-    return items.reduce(
-      (sum, item) => sum + item.order_price * item.order_quantity,
-      0
-    );
-  };
+    return items.reduce((sum, item) => sum + item.order_price * item.order_quantity, 0)
+  }
 
   // Format date string
   const formatDate = (dateString: string) => {
     try {
-      const date = new Date(dateString);
-      return format(date, "PPP 'at' p"); // e.g., "Apr 29, 2023 at 2:30 PM"
+      const date = new Date(dateString)
+      return format(date, "PPP 'at' p") // e.g., "Apr 29, 2023 at 2:30 PM"
     } catch (error) {
-      return dateString;
+      return dateString
     }
-  };
+  }
+
+  // Handle location update
+  const handleLocationUpdated = (newLocation: string) => {
+    if (selectedOrderForLocation) {
+      // Update the order in the local state
+      setOrders(
+        orders.map((order) =>
+          order.id === selectedOrderForLocation.id ? { ...order, order_location: newLocation } : order,
+        ),
+      )
+
+      toast.success("Delivery location updated successfully")
+      setSelectedOrderForLocation(null)
+    }
+  }
+
+  // Check if order can have its location edited
+  const canEditLocation = (status: string) => {
+    return ["pending", "assigned", "preparing"].includes(status)
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -149,8 +151,7 @@ export default function OrdersPage() {
           <ShoppingBag className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-2xl font-semibold mb-4">No orders yet</h2>
           <p className="text-muted-foreground mb-8">
-            You haven't placed any orders yet. Browse our restaurants to place
-            your first order!
+            You haven't placed any orders yet. Browse our restaurants to place your first order!
           </p>
           <Link to="/">
             <Button>Explore Restaurants</Button>
@@ -192,26 +193,40 @@ export default function OrdersPage() {
                     <span className="font-medium">Items:</span>
                   </div>
                   <ul className="pl-6 space-y-1">
-                    {order.order_items
-                      .slice(0, 3)
-                      .map((item: any, index: number) => (
-                        <li key={index} className="text-sm">
-                          {item.order_quantity}x {item.order_item} - $
-                          {(item.order_price * item.order_quantity).toFixed(2)}
-                        </li>
-                      ))}
-                    {order.order_items.length > 3 && (
-                      <li className="text-sm text-muted-foreground">
-                        +{order.order_items.length - 3} more items
+                    {order.order_items.slice(0, 3).map((item: any, index: number) => (
+                      <li key={index} className="text-sm">
+                        {item.order_quantity}x {item.order_item} - $
+                        {(item.order_price * item.order_quantity).toFixed(2)}
                       </li>
+                    ))}
+                    {order.order_items.length > 3 && (
+                      <li className="text-sm text-muted-foreground">+{order.order_items.length - 3} more items</li>
                     )}
                   </ul>
                 </div>
                 <Separator className="my-4" />
                 <div className="space-y-2">
-                  <div className="flex items-center text-sm">
-                    <Clock className="h-4 w-4 mr-1 text-muted-foreground" />
-                    <span className="font-medium">Delivery Address:</span>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center">
+                      <MapPin className="h-4 w-4 mr-1 text-muted-foreground" />
+                      <span className="font-medium">Delivery Address:</span>
+                    </div>
+                    {canEditLocation(order.order_status) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() =>
+                          setSelectedOrderForLocation({
+                            id: order.id,
+                            location: order.order_location,
+                          })
+                        }
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    )}
                   </div>
                   <p className="text-sm pl-6">{order.order_location}</p>
                 </div>
@@ -230,6 +245,17 @@ export default function OrdersPage() {
           ))}
         </div>
       )}
+
+      {/* Location Change Modal */}
+      {selectedOrderForLocation && (
+        <ChangeLocationModal
+          isOpen={!!selectedOrderForLocation}
+          onClose={() => setSelectedOrderForLocation(null)}
+          currentLocation={selectedOrderForLocation.location}
+          orderId={selectedOrderForLocation.id}
+          onLocationUpdated={handleLocationUpdated}
+        />
+      )}
     </div>
-  );
+  )
 }

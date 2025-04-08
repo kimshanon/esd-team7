@@ -106,6 +106,7 @@ def create_order():
     except ValidationError as e:
         return jsonify({"error": str(e)}), 400
 
+
 # PUT update an existing order.
 @app.route('/orders/<order_id>', methods=['PUT'])
 def update_order(order_id):
@@ -289,6 +290,64 @@ def get_picker_orders(picker_id):
         orders.append(order)
     
     return jsonify(orders), 200
+
+
+#updates location for the order 
+@app.route("/orders/<order_id>/location", methods=['PATCH'])
+def update_location(order_id):
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"code": 400, "message": "Missing JSON body"}), 400
+            
+        new_location = data.get("location")
+        if not new_location:
+            return jsonify({"code": 400, "message": "New location is required"}), 400
+            
+        # Validate location structure
+        required_fields = ["address", "coordinates", "postal"]
+        if not all(field in new_location for field in required_fields):
+            return jsonify({"code": 400, "message": "Location must include address, coordinates, and postal code"}), 400
+            
+        coordinates = new_location.get("coordinates", {})
+        if "lat" not in coordinates or "lng" not in coordinates:
+            return jsonify({"code": 400, "message": "Coordinates must include both lat and lng"}), 400
+            
+        # Get order document
+        order_ref = db.collection("orders").document(order_id)
+        order = order_ref.get()
+        if not order.exists:
+            return jsonify({"code": 404, "message": "Order not found"}), 404
+            
+        # Get current order data
+        order_data = order.to_dict()
+        
+        # Check if order status allows location update
+        allowed_statuses = ["pending", "assigned", "preparing"]
+        if order_data.get('order_status') not in allowed_statuses:
+            return jsonify({"code": 400, 
+                           "message": "Cannot update location for orders that are already delivering, completed, or cancelled"}), 400
+        
+        # Update both location and order_location fields
+        update_fields = {"location": new_location}
+        
+        # Always update order_location, even if it doesn't exist yet
+        update_fields["order_location"] = f"{new_location['address']}, {new_location['postal']}"
+            
+        # Update the document
+        order_ref.update(update_fields)
+        
+        # Return success response with updated location
+        return jsonify({
+            "code": 200, 
+            "message": f"Order {order_id} location updated successfully",
+            "location": new_location,
+            "order_location": update_fields["order_location"]
+        }), 200
+            
+    except Exception as e:
+        print(f"Error updating location: {str(e)}")
+        return jsonify({"code": 500, "message": f"Server error: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5003, threaded=True)
