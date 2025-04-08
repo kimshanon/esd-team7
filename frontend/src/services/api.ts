@@ -150,12 +150,30 @@ export const fetchPickerOrders = async (pickerId: string) => {
 export const fetchStamfordFoodListings = async (): Promise<FoodListing[]> => {
   try {
     const response = await axios.get<FoodListingsResponse>(`${FOOD_LISTINGS_API_URL}/FoodListings`);
-    const stamfordListings = response.data.FoodListings.filter(
-      listing => listing.PickupAddress === "80 Stamford Rd, Singapore 178902"
-    );
     
-    // Sort by expiry time (soonest first)
-    return stamfordListings.sort((a, b) => 
+    // Filter for any Stamford Road listings (case insensitive)
+    const stamfordListings = response.data.FoodListings.filter(
+      listing => listing.PickupAddress.toLowerCase().includes("stamford road")
+    );
+
+    // Create a map to deduplicate listings based on unique characteristics
+    const uniqueListings = new Map<string, FoodListing>();
+    
+    stamfordListings.forEach(listing => {
+      // Create a unique key based on title, restaurant, and expiry time
+      const key = `${listing.Title}-${listing.RestaurantName}-${listing.ExpiryTime}`;
+      
+      // If we haven't seen this listing before, add it to our map
+      if (!uniqueListings.has(key)) {
+        // Remove price information
+        const listingWithoutPrice = { ...listing };
+        delete listingWithoutPrice.Price;
+        uniqueListings.set(key, listingWithoutPrice);
+      }
+    });
+    
+    // Convert the map values back to an array and sort by expiry time
+    return Array.from(uniqueListings.values()).sort((a, b) => 
       new Date(a.ExpiryTime).getTime() - new Date(b.ExpiryTime).getTime()
     );
   } catch (error) {

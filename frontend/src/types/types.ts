@@ -52,9 +52,9 @@ export interface FoodListing {
   RestaurantEmail: string;
   RestaurantName: string;
   Title: string;
-  Qty?: number;
+  Qty: number;
   FoodType: string;
-  Price: number;
+  Price?: number;
   PickupAddress: string;
   ExpiryTime: string;
   CreatedTime: string;

@@ -71,7 +71,7 @@ export default function SpecialFoodListingsPage() {
       <div className="max-w-3xl mx-auto text-center mb-8">
         <h1 className="text-3xl font-bold mb-4">Special Food Listings</h1>
         <p className="text-muted-foreground">
-          Browse discounted food items available for pickup at SMU. Help reduce food waste and enjoy great deals!
+          Browse food items available for self-collection at SMU. Help reduce food waste and enjoy great food at a discounted price!
         </p>
       </div>
 
@@ -105,16 +105,30 @@ export default function SpecialFoodListingsPage() {
         <div className="text-center py-12">Loading food listings...</div>
       ) : error ? (
         <div className="text-center py-12 text-red-500">{error}</div>
+      ) : filteredListings.length === 0 ? (
+        <div className="text-center py-12">
+          <h2 className="text-xl font-semibold mb-2">No food listings found</h2>
+          <p className="text-muted-foreground">
+            Try adjusting your search or filters
+          </p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredListings.map((listing) => (
             <Card key={listing.Id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <div className="relative h-48">
+                <img
+                  src={listing.ImageText || "/placeholder.svg"}
+                  alt={listing.Title}
+                  className="w-full h-full object-cover"
+                />
+                <Badge variant="default" className="absolute top-2 right-2">
+                  {listing.FoodType}
+                </Badge>
+              </div>
               <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-semibold text-lg">{listing.Title}</h3>
-                  <Badge variant={listing.FoodType.toLowerCase() === "food" ? "default" : "secondary"}>
-                    {listing.FoodType}
-                  </Badge>
                 </div>
                 <p className="text-sm font-medium mb-1">{listing.RestaurantName}</p>
                 <p className="text-sm text-muted-foreground mb-2">
@@ -129,7 +143,7 @@ export default function SpecialFoodListingsPage() {
               <CardFooter className="p-4 pt-0 text-sm">
                 <div className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-lg">${listing.Price.toFixed(2)}</span>
+                    <span className="text-muted-foreground">Price available at store</span>
                   </div>
                   <div className="flex items-center text-muted-foreground">
                     <Clock className="h-4 w-4 mr-1" />
@@ -139,15 +153,6 @@ export default function SpecialFoodListingsPage() {
               </CardFooter>
             </Card>
           ))}
-        </div>
-      )}
-
-      {!loading && !error && filteredListings.length === 0 && (
-        <div className="text-center py-12">
-          <h2 className="text-xl font-semibold mb-2">No food listings found</h2>
-          <p className="text-muted-foreground">
-            Try adjusting your search or filters
-          </p>
         </div>
       )}
     </div>
