@@ -11,13 +11,16 @@ import { useCart } from "@/contexts/CartContext";
 import { useAppSelector } from "@/redux/hooks";
 import CartItemCard from "@/components/CartItemCard";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import DeliveryLocation from "@/components/DeliveryLocation";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+
 
 export default function CartPage() {
   const { cart, removeFromCart, updateQuantity, clearCart } = useCart();
   const [promoCode, setPromoCode] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isMapOpen, setIsMapOpen] = useState(false);
   const navigate = useNavigate();
 
   // Get user from auth state
@@ -30,6 +33,11 @@ export default function CartPage() {
   const deliveryFee = subtotal > 0 ? 3.99 : 0;
   const total = subtotal + deliveryFee;
 
+  const handleLocationChange = (location: string) => {
+    setDeliveryAddress(location);
+    setIsMapOpen(false);
+  };
+
   const handleCheckout = async () => {
     if (!isAuthenticated || !user) {
       toast.error("Please login to checkout");
@@ -38,7 +46,7 @@ export default function CartPage() {
     }
 
     if (!deliveryAddress.trim()) {
-      toast.error("Please enter a delivery address");
+      toast.error("Please select a delivery address");
       return;
     }
 
@@ -172,21 +180,44 @@ export default function CartPage() {
                 </div>
               </div>
 
-              {/* Delivery Address Input */}
+              {/* Replace Delivery Address Input with Button + Dialog */}
               <div className="space-y-2 mb-4">
                 <Label htmlFor="deliveryAddress" className="flex items-center">
                   <MapPin className="h-4 w-4 mr-1" />
                   Delivery Address
                 </Label>
-                <Textarea
-                  id="deliveryAddress"
-                  placeholder="Enter your delivery address"
-                  value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
-                  className="resize-none"
-                  rows={3}
-                  required
-                />
+
+                <Dialog open={isMapOpen} onOpenChange={setIsMapOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full text-left justify-between font-normal"
+                    >
+                      {deliveryAddress ? (
+                        <span className="truncate">{deliveryAddress}</span>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          Select delivery location
+                        </span>
+                      )}
+                      <MapPin className="h-4 w-4 ml-2 flex-shrink-0" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[700px] p-0 h-auto max-h-[90vh] overflow-hidden">
+                    {/* Remove the close button from DialogContent by passing hideCloseButton prop */}
+                    <DeliveryLocation
+                      currentLocation={deliveryAddress}
+                      onClose={() => setIsMapOpen(false)}
+                      onLocationChange={handleLocationChange}
+                    />
+                  </DialogContent>
+                </Dialog>
+
+                {deliveryAddress && (
+                  <p className="text-xs text-muted-foreground mt-1 ml-1">
+                    {deliveryAddress}
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-2 mb-4">
