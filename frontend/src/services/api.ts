@@ -1,8 +1,9 @@
 import axios from "axios";
-import { Stall, Restaurant, MenuItem, MenuItemFrontend } from "../types/types";
+import { Stall, Restaurant, MenuItem, MenuItemFrontend, FoodListingsResponse, SingleFoodListingResponse, FoodListing } from "../types/types";
 
 const API_URL = "http://127.0.0.1:5002";
 const ORDER_API_URL = "http://127.0.0.1:5003";
+const FOOD_LISTINGS_API_URL = "https://personal-9l4pf9hj.outsystemscloud.com/FoodListingsAPI/rest/FoodListingAPI";
 
 
 
@@ -141,6 +142,37 @@ export const fetchPickerOrders = async (pickerId: string) => {
     return response.data;
   } catch (error) {
     console.error(`Error fetching orders for picker ${pickerId}:`, error);
+    throw error;
+  }
+};
+
+// Fetch all food listings from Stamford Road
+export const fetchStamfordFoodListings = async (): Promise<FoodListing[]> => {
+  try {
+    const response = await axios.get<FoodListingsResponse>(`${FOOD_LISTINGS_API_URL}/FoodListings`);
+    const stamfordListings = response.data.FoodListings.filter(
+      listing => listing.PickupAddress === "80 Stamford Rd, Singapore 178902"
+    );
+    
+    // Sort by expiry time (soonest first)
+    return stamfordListings.sort((a, b) => 
+      new Date(a.ExpiryTime).getTime() - new Date(b.ExpiryTime).getTime()
+    );
+  } catch (error) {
+    console.error("Error fetching Stamford food listings:", error);
+    throw error;
+  }
+};
+
+// Fetch a single food listing by ID
+export const fetchFoodListingById = async (id: number): Promise<FoodListing> => {
+  try {
+    const response = await axios.get<SingleFoodListingResponse>(
+      `${FOOD_LISTINGS_API_URL}/FoodListing/${id}`
+    );
+    return response.data.FoodListing;
+  } catch (error) {
+    console.error(`Error fetching food listing with ID ${id}:`, error);
     throw error;
   }
 };
