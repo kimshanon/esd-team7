@@ -46,3 +46,31 @@ export interface MenuItemFrontend {
   category: string;
   image: string;
 }
+
+export interface FoodListing {
+  Id: number;
+  RestaurantEmail: string;
+  RestaurantName: string;
+  Title: string;
+  Qty?: number;
+  FoodType: string;
+  Price: number;
+  PickupAddress: string;
+  ExpiryTime: string;
+  CreatedTime: string;
+  ImageText?: string;
+}
+
+export interface FoodListingsResponse {
+  Result: {
+    Success: boolean;
+  };
+  FoodListings: FoodListing[];
+}
+
+export interface SingleFoodListingResponse {
+  Result: {
+    Success: boolean;
+  };
+  FoodListing: FoodListing;
+}

@@ -9,6 +9,7 @@ import CartPage from "./pages/CartPage";
 import OrdersPage from "./pages/OrdersPage";
 import OrderTrackingPage from "./pages/OrderTrackingPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import SpecialFoodListingsPage from "./pages/SpecialFoodListingsPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import PickerLayout from "./components/PickerLayout";
 import PickerDashboard from "./pages/picker/PickerDashboard";
@@ -58,6 +59,7 @@ function App() {
         {/* Regular customer routes */}
         <Route index element={<RestaurantsPage />} />
         <Route path="restaurants/:id" element={<RestaurantDetailPage />} />
+        <Route path="special" element={<SpecialFoodListingsPage />} />
         <Route
           path="cart"
           element={
