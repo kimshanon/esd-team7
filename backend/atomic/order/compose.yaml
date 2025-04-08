@@ -1,13 +1,20 @@
-#compose.yaml
 services:
   order:
     build:
       context: ./
       dockerfile: Dockerfile
-    image: order:1.0
+    image: johngohenliang/order:1.0
+    restart: always
     container_name: order
+    environment:
+      dbURL: mysql+mysqlconnector://is213@host.docker.internal:3306/order
+      PYTHONUNBUFFERED: 1
+    networks:
+      - esd-net  # <-- Add this line
     ports:
-      - "5001:5001"
+      - "5003:5003"
 
 
-
+networks:
+  esd-net:
+    external: true  # <-- Because Kong already created it
