@@ -65,6 +65,74 @@ def get_picker(picker_id):
     picker['id'] = doc.id
     return jsonify(picker), 200
 
+# GET a picker's credit balance
+@app.route('/pickers/<picker_id>/credits', methods=['GET'])
+def get_picker_credits(picker_id):
+    """Retrieve the credit balance for a specific picker"""
+    doc_ref = db.collection('pickers').document(picker_id)
+    doc = doc_ref.get()
+    
+    if not doc.exists:
+        abort(404, description="Picker not found")
+    
+    picker_data = doc.to_dict()
+    return jsonify({
+        "picker_id": picker_id,
+        "picker_name": picker_data.get('picker_name'),
+        "picker_credits": picker_data.get('picker_credits', 0)
+    }), 200
+
+# PATCH to update picker credits
+@app.route('/pickers/<picker_id>/credits', methods=['PATCH'])
+def update_picker_credits(picker_id):
+    """Update a picker's credit balance by adding/subtracting the specified amount"""
+    doc_ref = db.collection('pickers').document(picker_id)
+    doc = doc_ref.get()
+    
+    if not doc.exists:
+        abort(404, description="Picker not found")
+    
+    data = request.get_json()
+    if not data or 'amount' not in data:
+        abort(400, description="Request must include 'amount' field")
+    
+    try:
+        # Get the amount to add/subtract (can be negative for deductions)
+        amount = float(data['amount'])
+        
+        # Get the current picker data
+        current_data = doc.to_dict()
+        current_credits = current_data.get('picker_credits', 0)
+        
+        # Calculate new credit balance
+        new_credits = current_credits + amount
+        
+        # Prevent negative balance if needed
+        if new_credits < 0 and not data.get('allow_negative', False):
+            abort(400, description="Operation would result in negative credits")
+        
+        # Update the picker's credits
+        current_data.update({'picker_credits': new_credits})
+        
+        # Validate the updated data with Pydantic
+        updated_picker = PickerModel(**current_data)
+        
+        # Update just the credits field in Firestore
+        doc_ref.update({'picker_credits': new_credits})
+        
+        # Return success response with updated credit information
+        return jsonify({
+            "picker_id": picker_id,
+            "previous_credits": current_credits,
+            "amount_changed": amount,
+            "new_credits": new_credits
+        }), 200
+        
+    except ValueError:
+        abort(400, description="Amount must be a number")
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
+
 # POST create a new picker.
 @app.route('/pickers', methods=['POST'])
 def create_picker():

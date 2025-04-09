@@ -34,6 +34,7 @@ EXCHANGE_NAME = "order_delivery_exchange"
 EXCHANGE_TYPE = "fanout"
 ORDER_SERVICE_URL = os.getenv("ORDER_SERVICE_URL", "http://localhost:5003")
 PICKER_SERVICE_URL = os.getenv("PICKER_SERVICE_URL", "http://localhost:5001")
+CALC_PAYMENT_SERVICE_URL = os.getenv("CALC_PAYMENT_SERVICE_URL", "http://calc-payment-service:5009")
 
 # Track active pickers and their socket IDs
 active_pickers = {}
@@ -286,8 +287,6 @@ def create_order():
         if not order_data:
             return jsonify({"error": "Missing order data"}), 400
         
-        # Deduct payment from customer first
-
         # Calls the ORDER MS to create a new order
         print(f"Sending to order service: {ORDER_URL}")
         response = requests.post(ORDER_URL, json=order_data)
@@ -300,6 +299,67 @@ def create_order():
         new_order = response.json()
         order_id = new_order.get("id")
         print(f"Order created with ID: {order_id}")
+        
+        # Process payment for the order
+        try:
+            # Calculate total amount from order items
+            order_items = order_data.get("order_items", [])
+            total_amount = 0
+            
+            for item in order_items:
+                # Make sure item_price and quantity can be properly converted to numbers
+                try:
+                    item_price = float(item.get("order_price"))
+                    item_quantity = int(item.get("order_quantity"))
+                    item_total = item_price * item_quantity
+                    print(f"Item: {item.get('order_item', 'unknown')} - Price: {item_price} x Quantity: {item_quantity} = {item_total}")
+                    total_amount += item_total
+                except (ValueError, TypeError) as e:
+                    print(f"Error parsing item values: {e}, using defaults")
+            
+            print(f"Calculated total amount for order {order_id}: {total_amount}")
+            
+            # Make sure the total amount is greater than zero
+            if total_amount <= 0:
+                print(f"Warning: Order total is {total_amount}, setting minimum amount of 0.01")
+            
+            # Prepare payment data
+            payment_data = {
+                "customer_id": order_data.get("customer_id"),
+                "picker_id": new_order.get("picker_id", "none"),  # May be pending so no picker yet
+                "order_id": order_id,
+                "amount": total_amount
+            }
+            
+            # Call the payment service to process payment
+            print(f"Processing payment for order {order_id}, amount: {total_amount}")
+            payment_response = requests.post(
+                f"{CALC_PAYMENT_SERVICE_URL}/customer/pay",
+                json=payment_data
+            )
+            
+            if payment_response.status_code != 200:
+                print(f"Payment failed: {payment_response.text}")
+                # If payment fails, we should cancel the order
+                cancel_response = requests.patch(
+                    f"{ORDER_URL}/{order_id}/status",
+                    json={"order_status": "cancelled"}
+                )
+                return jsonify({
+                    "error": "Payment failed, order cancelled",
+                    "payment_error": payment_response.json()
+                }), payment_response.status_code
+            
+            print(f"Payment successful for order {order_id}")
+            
+        except Exception as e:
+            print(f"Error processing payment: {str(e)}")
+            # Cancel the order if payment processing failed
+            cancel_response = requests.patch(
+                f"{ORDER_URL}/{order_id}/status",
+                json={"order_status": "cancelled"}
+            )
+            return jsonify({"error": f"Failed to process payment: {str(e)}, order cancelled"}), 500
         
         # Stores the order data in the pending order dict
         pending_orders[order_id] = new_order
@@ -331,6 +391,10 @@ def create_order():
         
         print(f"Publishing to RabbitMQ: {message}")
         publish_to_rabbitmq(message)
+        
+        # Include payment information in the response
+        new_order["payment_processed"] = True
+        new_order["amount_paid"] = total_amount
         
         return jsonify(new_order), 201
     
