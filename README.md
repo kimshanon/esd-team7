@@ -26,7 +26,7 @@ Email: picker1@gmail.com
 Password: 12345678
 
 ### Food Picker 2 (Login as food picker)
-Email:picker2@gmail.com  
+Email: picker2@gmail.com  
 Password: 12345678
 
 
