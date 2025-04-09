@@ -14,6 +14,15 @@ export default function RouteMap({ startLocation, endLocation, onRouteCalculated
   const directionsRenderer = useRef<google.maps.DirectionsRenderer | null>(null);
   const [estimatedTime, setEstimatedTime] = useState<string>("");
   const [isMapInitialized, setIsMapInitialized] = useState<boolean>(false);
+  const [googleApi, setGoogleApi] = useState<any>(null);
+  
+  // Store the current locations for use in callbacks
+  const locationRef = useRef({ start: startLocation, end: endLocation });
+
+  // Update locationRef whenever props change
+  useEffect(() => {
+    locationRef.current = { start: startLocation, end: endLocation };
+  }, [startLocation, endLocation]);
 
   useEffect(() => {
     // Initialize map once
@@ -25,7 +34,11 @@ export default function RouteMap({ startLocation, endLocation, onRouteCalculated
       });
 
       try {
+        // Short delay to ensure DOM is ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         const google = await loader.load();
+        setGoogleApi(google);
         
         // Initialize map
         if (mapRef.current && !mapInstance.current) {
@@ -38,20 +51,28 @@ export default function RouteMap({ startLocation, endLocation, onRouteCalculated
             zoomControl: true,
           });
 
-          // Initialize directions service and renderer
-          directionsService.current = new google.maps.DirectionsService();
-          directionsRenderer.current = new google.maps.DirectionsRenderer({
-            map: mapInstance.current,
-            suppressMarkers: false,
-            polylineOptions: {
-              strokeColor: "#2563eb",
-              strokeWeight: 5,
-            },
+          // Wait for map to be fully loaded before proceeding
+          google.maps.event.addListenerOnce(mapInstance.current, 'idle', () => {
+            console.log("Map fully loaded and ready");
+            
+            // Initialize directions service and renderer
+            directionsService.current = new google.maps.DirectionsService();
+            directionsRenderer.current = new google.maps.DirectionsRenderer({
+              map: mapInstance.current,
+              suppressMarkers: false,
+              polylineOptions: {
+                strokeColor: "#2563eb",
+                strokeWeight: 5,
+              },
+            });
+            
+            // Set map as initialized
+            setIsMapInitialized(true);
+            console.log("Map initialized successfully");
+            
+            // Calculate route immediately after map is fully loaded
+            calculateRoute(locationRef.current.start, locationRef.current.end);
           });
-          
-          // Set map as initialized
-          setIsMapInitialized(true);
-          console.log("Map initialized successfully");
         }
       } catch (error) {
         console.error("Error initializing Google Maps:", error);
@@ -68,60 +89,76 @@ export default function RouteMap({ startLocation, endLocation, onRouteCalculated
     };
   }, []); // Empty dependency array means this only runs once
 
-  // Update route whenever locations change or map is initialized
-  useEffect(() => {
-    const updateRoute = async () => {
-      if (!isMapInitialized || !directionsService.current || !directionsRenderer.current || !mapInstance.current) {
-        console.log("Map not initialized yet, will try again when ready");
-        return;
-      }
+  // Function to calculate route (more reliable as a separate function)
+  const calculateRoute = (origin: string, destination: string) => {
+    if (!directionsService.current || !directionsRenderer.current || !googleApi) {
+      console.log("Map services not ready yet");
+      return;
+    }
 
-      console.log("Updating route with:", { startLocation, endLocation });
+    console.log("Calculating route:", { origin, destination });
 
-      // Create route request
-      const request = {
-        origin: startLocation,
-        destination: endLocation,
-        travelMode: google.maps.TravelMode.WALKING,
-      };
-
-      // Get directions
-      directionsService.current.route(request, (result, status) => {
-        if (status === "OK" && directionsRenderer.current && result) {
-          console.log("Route calculated successfully");
-          directionsRenderer.current.setDirections(result);
-          
-          // Extract and display the duration
-          if (result.routes[0] && result.routes[0].legs[0]) {
-            const duration = result.routes[0].legs[0].duration?.text || "Unknown";
-            setEstimatedTime(duration);
-            
-            // Call the callback if provided
-            if (onRouteCalculated) {
-              onRouteCalculated(duration);
-            }
-          }
-          
-          // Fit map to show the entire route
-          const bounds = new google.maps.LatLngBounds();
-          result.routes[0].bounds.getNorthEast();
-          result.routes[0].bounds.getSouthWest();
-          mapInstance.current?.fitBounds(result.routes[0].bounds);
-        } else {
-          console.error("Error calculating route:", status);
-        }
-      });
+    // Create route request
+    const request = {
+      origin,
+      destination,
+      travelMode: googleApi.maps.TravelMode.WALKING,
     };
 
-    if (startLocation && endLocation && isMapInitialized) {
-      console.log("Attempting to update route with initialized map");
-      updateRoute();
+    // Get directions
+    directionsService.current.route(request, (result, status) => {
+      if (status === "OK" && directionsRenderer.current && result) {
+        console.log("Route calculated successfully");
+        
+        // Need to ensure map is still valid
+        if (!mapInstance.current) return;
+        
+        // Ensure the renderer is attached to the map
+        directionsRenderer.current.setMap(mapInstance.current);
+        
+        // Set the directions
+        directionsRenderer.current.setDirections(result);
+        
+        // Extract and display the duration
+        if (result.routes[0] && result.routes[0].legs[0]) {
+          const duration = result.routes[0].legs[0].duration?.text || "Unknown";
+          setEstimatedTime(duration);
+          
+          // Call the callback if provided
+          if (onRouteCalculated) {
+            onRouteCalculated(duration);
+          }
+        }
+        
+        // Fit map to show the entire route
+        if (mapInstance.current && result.routes[0] && result.routes[0].bounds) {
+          mapInstance.current.fitBounds(result.routes[0].bounds);
+        }
+      } else {
+        console.error("Error calculating route:", status);
+      }
+    });
+  };
+
+  // Update route whenever locations change
+  useEffect(() => {
+    if (isMapInitialized && startLocation && endLocation) {
+      console.log("Locations changed, recalculating route");
+      calculateRoute(startLocation, endLocation);
     }
-  }, [startLocation, endLocation, onRouteCalculated, isMapInitialized]);
+  }, [startLocation, endLocation, isMapInitialized]);
 
   return (
     <div className="w-full h-[400px] rounded-lg overflow-hidden relative">
       <div ref={mapRef} className="w-full h-full" />
+      {!isMapInitialized && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-75">
+          <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
+            <span className="text-gray-700">Loading map...</span>
+          </div>
+        </div>
+      )}
       {estimatedTime && (
         <div className="absolute bottom-4 left-4 bg-gray-800 px-4 py-3 rounded-md shadow-lg z-10">
           <p className="text-sm font-medium text-white">Estimated walking time: <span className="font-bold text-yellow-300">{estimatedTime}</span></p>
@@ -129,4 +166,4 @@ export default function RouteMap({ startLocation, endLocation, onRouteCalculated
       )}
     </div>
   );
-} 
+}

@@ -77,7 +77,7 @@ export default function OrdersPage() {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${API.CUSTOMER_URL}/customers/${user.id}/orders`
+        `${API.ORDER_URL}/customers/${user.id}/orders`
       );
 
       // Filter out completed orders and count them

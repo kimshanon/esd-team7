@@ -1,0 +1,353 @@
+openapi: 3.0.0
+info:
+  title: Payment Microservice API
+  version: "1.0.0"
+  description: |
+    This API handles payment transactions using Firebase Firestore.
+    It includes endpoints for creating, retrieving, updating, and deleting payments.
+servers:
+  - url: http://localhost:5004
+paths:
+  /:
+    get:
+      summary: Home
+      description: Returns a welcome message indicating the Payment Microservice is running.
+      responses:
+        '200':
+          description: A simple message.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Payment Microservice (Using Firebase Firestore)
+  /payments:
+    get:
+      summary: Retrieve All Payments
+      description: Retrieves all payment documents stored in Firestore.
+      responses:
+        '200':
+          description: Payments found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Payment'
+        '404':
+          description: No payments found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 404
+                  message:
+                    type: string
+                    example: No payments found.
+  /payment/{payment_id}/status:
+    put:
+      summary: Update Payment Status
+      description: Updates the status of an existing payment.
+      parameters:
+        - name: payment_id
+          in: path
+          description: The unique identifier of the payment.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: JSON object containing the new payment status.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payment_status:
+                  type: string
+                  example: refunded
+      responses:
+        '200':
+          description: Payment status updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: Payment {payment_id} status updated to refunded.
+        '400':
+          description: Missing or invalid payment status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 400
+                  message:
+                    type: string
+        '404':
+          description: Payment not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 404
+                  message:
+                    type: string
+                    example: Payment {payment_id} not found.
+  /payment/{payment_id}:
+    get:
+      summary: Get Payment Status
+      description: Retrieves the status of a specific payment.
+      parameters:
+        - name: payment_id
+          in: path
+          description: The unique identifier of the payment.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  payment_status:
+                    type: string
+                    example: Completed
+        '404':
+          description: Payment not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 404
+                  message:
+                    type: string
+                    example: Payment {payment_id} not found.
+  /payment/{payment_id}/transaction:
+    get:
+      summary: Get Transaction Details
+      description: Retrieves detailed transaction information for a specific payment.
+      parameters:
+        - name: payment_id
+          in: path
+          description: The unique identifier of the payment.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction details retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  payment_details:
+                    type: object
+                    properties:
+                      log_id:
+                        type: string
+                      order_id:
+                        type: string
+                      customer_id:
+                        type: string
+                      event_type:
+                        type: string
+                      event_details:
+                        type: string
+                      payment_amount:
+                        type: number
+                      payment_status:
+                        type: string
+                      timestamp:
+                        type: string
+                        format: date-time
+        '404':
+          description: Payment not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 404
+                  message:
+                    type: string
+                    example: Payment {payment_id} not found.
+  /payment:
+    post:
+      summary: Create Payment Transaction
+      description: Creates a new payment transaction and stores it in Firestore.
+      requestBody:
+        description: Payment transaction object to be created.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Payment'
+      responses:
+        '201':
+          description: Payment transaction created successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Payment transaction created successfully.
+                  transaction_id:
+                    type: string
+                  payment_data:
+                    $ref: '#/components/schemas/Payment'
+        '400':
+          description: Validation error or bad request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /payments/{paymentID}:
+    delete:
+      summary: Delete Payment
+      description: Deletes a payment by its unique identifier.
+      parameters:
+        - name: paymentID
+          in: path
+          description: The unique identifier of the payment.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment deleted successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: Payment {paymentID} has been deleted.
+        '404':
+          description: Payment not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 404
+                  message:
+                    type: string
+                    example: Payment {paymentID} not found.
+  /payments/customer/{customer_id}:
+    get:
+      summary: Get Payments by Customer ID
+      description: Retrieves all payments associated with a specific customer.
+      parameters:
+        - name: customer_id
+          in: path
+          description: The customer's unique identifier.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of payments for the customer.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+        '500':
+          description: Error fetching payments.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+components:
+  schemas:
+    Payment:
+      type: object
+      properties:
+        payment_id:
+          type: string
+          description: Unique payment identifier.
+        log_id:
+          type: string
+        order_id:
+          type: string
+        customer_id:
+          type: string
+        event_type:
+          type: string
+        event_details:
+          type: string
+        payment_amount:
+          type: number
+        payment_status:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - log_id
+        - order_id
+        - customer_id
+        - event_type
+        - event_details
+        - payment_amount
+        - payment_status
+        - timestamp

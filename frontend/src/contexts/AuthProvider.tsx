@@ -2,7 +2,7 @@ import { ReactNode, useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import axios from "axios";
 import { toast } from "sonner";
-import { API_BASE_URL } from "@/config/api";
+import * as API from "@/config/api";
 
 import { auth } from "@/config/firebase";
 import { useAppDispatch } from "@/redux/hooks";
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // Try customer endpoint first
           try {
             const customerResponse = await axios.get(
-              `${API_BASE_URL}:5000/customers/${firebaseUser.uid}`
+              `${API.CUSTOMER_URL}/customers/${firebaseUser.uid}`
             );
             userData = customerResponse.data;
             userType = "customer";
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
             // If customer not found (will throw an error), try picker endpoint
             const pickerResponse = await axios.get(
-              `${API_BASE_URL}:5001/pickers/${firebaseUser.uid}`
+              `${API.PICKER_URL}/pickers/${firebaseUser.uid}`
             );
             userData = pickerResponse.data;
             userType = "picker";

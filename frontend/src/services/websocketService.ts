@@ -32,7 +32,12 @@ class WebSocketService {
       return;
     }
 
-    this.socket = io(url);
+    this.socket = io(url, {
+      // transports: ["websocket", "polling"],
+      // withCredentials: true,
+      // If you created a separate route for WebSockets with a specific path:
+      // path: "/api/assign-picker/socket.io", // Only if your Kong route doesn't already include /socket.io
+    });
 
     this.socket.on("connect", () => {
       console.log("WebSocket connected");

@@ -53,7 +53,7 @@ export default function CompletedOrdersPage() {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${API.CUSTOMER_URL}/customers/${user.id}/orders`
+        `${API.ORDER_URL}/customers/${user.id}/orders`
       );
 
       // Filter for completed orders only and sort by date (newest first)

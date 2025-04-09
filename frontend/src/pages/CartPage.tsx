@@ -83,7 +83,7 @@ export default function CartPage() {
       // Instead of posting directly to the orders API, we'll post through
       // the assignment service to handle the WebSocket broadcasting
       const response = await axios.post(
-        `${API.ORDER_URL}/orders`, // This endpoint forwards to the order service and handles WebSocket
+        `${API.ASSIGN_PICKER_URL}/orders`, // This endpoint forwards to the order service and handles WebSocket
         orderData
       );
 
