@@ -15,6 +15,7 @@ import {
 import axios from "axios";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import * as API from "@/config/api";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -120,7 +121,7 @@ export default function OrderTrackingPage() {
       if (order.picker_id) {
         try {
           const pickerResponse = await axios.get(
-            `http://127.0.0.1:5001/pickers/${order.picker_id}`
+            `${API.PICKER_URL}/pickers/${order.picker_id}`
           );
           setPickerInfo(pickerResponse.data);
         } catch (err) {
@@ -219,7 +220,7 @@ export default function OrderTrackingPage() {
 
   // Update useEffect to fetch route information when order changes
   useEffect(() => {
-    if (order && user?.role === "picker") {
+    if (order && user?.userType === "picker") {
       const fetchRoute = async () => {
         try {
           const route = await fetchRouteInfo(
@@ -233,7 +234,7 @@ export default function OrderTrackingPage() {
       };
       fetchRoute();
     }
-  }, [order, user?.role]);
+  }, [order, user?.userType]);
 
   // Calculate total cost
   const calculateTotal = (items: any[]) => {
@@ -420,7 +421,7 @@ export default function OrderTrackingPage() {
               </div>
 
               {/* Only show route information for pickers */}
-              {user?.role === "picker" && routeInfo && (
+              {user?.userType === "picker" && routeInfo && (
                 <div>
                   <div className="flex items-center text-sm text-muted-foreground mb-1">
                     <Navigation className="h-4 w-4 mr-1" />
@@ -486,7 +487,7 @@ export default function OrderTrackingPage() {
       />
 
       {/* Only show route information for pickers */}
-      {user?.role === "picker" && routeInfo && (
+      {user?.userType === "picker" && routeInfo && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Delivery Route</CardTitle>

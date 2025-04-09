@@ -7,6 +7,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 // import { doc, setDoc } from "firebase/firestore";
+import * as API from "@/config/api";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -91,8 +92,8 @@ export default function RegisterPage() {
       // Different endpoints based on user type
       const endpoint =
         userType === "customer"
-          ? "http://localhost:5000/customers"
-          : "http://localhost:5001/pickers";
+          ? `${API.CUSTOMER_URL}/customers`
+          : `${API.PICKER_URL}/pickers`;
 
       // Create user record in our backend
       await axios.post(endpoint, userData);

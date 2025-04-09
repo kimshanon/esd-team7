@@ -12,6 +12,7 @@ import axios from "axios";
 import { format } from "date-fns";
 import { useAppSelector } from "@/redux/hooks";
 import { toast } from "sonner";
+import * as API from "@/config/api";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -52,7 +53,7 @@ export default function CompletedOrdersPage() {
     try {
       setLoading(true);
       const response = await axios.get(
-        `http://127.0.0.1:5003/customers/${user.id}/orders`
+        `${API.CUSTOMER_URL}/customers/${user.id}/orders`
       );
 
       // Filter for completed orders only and sort by date (newest first)
@@ -128,7 +129,7 @@ export default function CompletedOrdersPage() {
 
       // Call the refund endpoint
       const response = await axios.post(
-        "http://127.0.0.1:5009/customer/refund",
+        `${API.CREDIT_URL}/customer/refund`,
         {
           customer_id: user.id,
           order_id: selectedOrderId,

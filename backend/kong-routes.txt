@@ -1,0 +1,184 @@
+# Kong Routes Configuration for ESD-Team7
+
+## Atomic Microservices
+
+# 1. Customer Microservice - Port 5000
+- Original URL: http://customer-service:5000
+- Kong Route: /api/customer
+- Kong Route Configuration:
+  - Strip path: true
+  - Paths:
+    - /api/customer
+  - Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+  - Upstream URL: http://customer-service:5000
+
+# Atomic Customer Microservice Endpoints:
+- GET /test → Kong: GET /api/customer/test
+- GET /customers → Kong: GET /api/customer/customers
+- GET /customers/{customer_id} → Kong: GET /api/customer/customers/{customer_id}
+- GET /customers/{customer_id}/credits → Kong: GET /api/customer/customers/{customer_id}/credits
+- PATCH /customers/{customer_id}/credits → Kong: PATCH /api/customer/customers/{customer_id}/credits
+- POST /customers → Kong: POST /api/customer/customers
+- PUT /customers/{customer_id} → Kong: PUT /api/customer/customers/{customer_id}
+- DELETE /customers/{customer_id} → Kong: DELETE /api/customer/customers/{customer_id}
+
+# 2. Picker Microservice - Port 5001
+- Original URL: http://picker-service:5001
+- Kong Route: /api/picker
+- Kong Route Configuration:
+  - Strip path: true
+  - Paths:
+    - /api/picker
+  - Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+  - Upstream URL: http://picker-service:5001
+
+# Atomic Picker Microservice Endpoints:
+- GET /test → Kong: GET /api/picker/test
+- GET /pickers → Kong: GET /api/picker/pickers
+- GET /pickers/available → Kong: GET /api/picker/pickers/available
+- GET /pickers/{picker_id} → Kong: GET /api/picker/pickers/{picker_id}
+- GET /pickers/{picker_id}/credits → Kong: GET /api/picker/pickers/{picker_id}/credits
+- PATCH /pickers/{picker_id}/credits → Kong: PATCH /api/picker/pickers/{picker_id}/credits
+- POST /pickers → Kong: POST /api/picker/pickers
+- PUT /pickers/{picker_id} → Kong: PUT /api/picker/pickers/{picker_id}
+- PATCH /pickers/{picker_id}/availability → Kong: PATCH /api/picker/pickers/{picker_id}/availability
+- DELETE /pickers/{picker_id} → Kong: DELETE /api/picker/pickers/{picker_id}
+
+# 3. Stall/Menu Microservice - Port 5002
+- Original URL: http://stall-service:5002
+- Kong Route: /api/stall
+- Kong Route Configuration:
+  - Strip path: true
+  - Paths:
+    - /api/stall
+  - Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+  - Upstream URL: http://stall-service:5002
+
+# Atomic Stall Microservice Endpoints:
+- GET /test → Kong: GET /api/stall/test
+- GET /stalls → Kong: GET /api/stall/stalls
+- GET /stalls/{stall_id} → Kong: GET /api/stall/stalls/{stall_id}
+- POST /stalls → Kong: POST /api/stall/stalls
+- PUT /stalls/{stall_id} → Kong: PUT /api/stall/stalls/{stall_id}
+- DELETE /stalls/{stall_id} → Kong: DELETE /api/stall/stalls/{stall_id}
+- GET /stalls/{stall_id}/menu → Kong: GET /api/stall/stalls/{stall_id}/menu
+- POST /stalls/{stall_id}/menu → Kong: POST /api/stall/stalls/{stall_id}/menu
+- PUT /stalls/{stall_id}/menu/{food_id} → Kong: PUT /api/stall/stalls/{stall_id}/menu/{food_id}
+- DELETE /stalls/{stall_id}/menu/{food_id} → Kong: DELETE /api/stall/stalls/{stall_id}/menu/{food_id}
+
+# 4. Order Microservice - Port 5003
+- Original URL: http://order-service:5003
+- Kong Route: /api/order
+- Kong Route Configuration:
+  - Strip path: true
+  - Paths:
+    - /api/order
+  - Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+  - Upstream URL: http://order-service:5003
+
+# Atomic Order Microservice Endpoints:
+- GET /test → Kong: GET /api/order/test
+- GET /orders → Kong: GET /api/order/orders
+- GET /orders/{order_id} → Kong: GET /api/order/orders/{order_id}
+- POST /orders → Kong: POST /api/order/orders
+- PUT /orders/{order_id} → Kong: PUT /api/order/orders/{order_id}
+- PATCH /orders/{order_id}/status → Kong: PATCH /api/order/orders/{order_id}/status
+- DELETE /orders/{order_id} → Kong: DELETE /api/order/orders/{order_id}
+- GET /customers/{customer_id}/orders → Kong: GET /api/order/customers/{customer_id}/orders
+- GET /pickers/{picker_id}/orders → Kong: GET /api/order/pickers/{picker_id}/orders
+- PATCH /orders/{order_id}/location → Kong: PATCH /api/order/orders/{order_id}/location
+
+# 5. Payment Microservice - Port 5004
+- Original URL: http://payment-service:5004
+- Kong Route: /api/payment
+- Kong Route Configuration:
+  - Strip path: true
+  - Paths:
+    - /api/payment
+  - Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+  - Upstream URL: http://payment-service:5004
+
+# Atomic Payment Microservice Endpoints:
+- GET / → Kong: GET /api/payment/
+- GET /payments → Kong: GET /api/payment/payments
+- PUT /payment/{payment_id}/status → Kong: PUT /api/payment/payment/{payment_id}/status
+- GET /payment/{payment_id} → Kong: GET /api/payment/payment/{payment_id}
+- GET /payment/{payment_id}/transaction → Kong: GET /api/payment/payment/{payment_id}/transaction
+- POST /payment → Kong: POST /api/payment/payment
+- DELETE /payments/{paymentID} → Kong: DELETE /api/payment/payments/{paymentID}
+- GET /payments/customer/{customer_id} → Kong: GET /api/payment/payments/customer/{customer_id}
+
+## Composite Microservices
+
+# 1. Assign Picker Composite Service - Port 5005
+- Original URL: http://assign-picker-service:5005
+- Kong Route: /api/assign-picker
+- Kong Route Configuration:
+  - Strip path: true
+  - Paths:
+    - /api/assign-picker
+  - Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+  - Upstream URL: http://assign-picker-service:5005
+
+# Assign Picker Composite Microservice Endpoints:
+- GET /test → Kong: GET /api/assign-picker/test
+- POST /orders → Kong: POST /api/assign-picker/orders
+- POST /picker_accept → Kong: POST /api/assign-picker/picker_accept
+- POST /order_status → Kong: POST /api/assign-picker/order_status
+- POST /orders/{order_id}/cancel → Kong: POST /api/assign-picker/orders/{order_id}/cancel
+- GET /debug/pending_orders → Kong: GET /api/assign-picker/debug/pending_orders
+- GET /debug/active_pickers → Kong: GET /api/assign-picker/debug/active_pickers
+- POST /order_cancel → Kong: POST /api/assign-picker/order_cancel
+
+# 2. Payment/Credit Management Composite Service - Port 5009
+- Original URL: http://calc-payment-service:5009
+- Kong Route: /api/credit
+- Kong Route Configuration:
+  - Strip path: true
+  - Paths:
+    - /api/credit
+  - Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+  - Upstream URL: http://calc-payment-service:5009
+
+# Payment/Credit Management Composite Endpoints:
+- GET / → Kong: GET /api/credit/
+- POST /credits/add → Kong: POST /api/credit/credits/add
+- POST /customer/pay → Kong: POST /api/credit/customer/pay
+- POST /customer/refund → Kong: POST /api/credit/customer/refund
+
+# 3. Location Update Composite Service - Port 5002
+- Original URL: http://update-location-service:5002
+- Kong Route: /api/location
+- Kong Route Configuration:
+  - Strip path: true
+  - Paths:
+    - /api/location
+  - Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+  - Upstream URL: http://update-location-service:5002
+
+# Location Update Composite Endpoints:
+- GET /test → Kong: GET /api/location/test
+- POST /update-location → Kong: POST /api/location/update-location
+
+# 4. Cancellation Composite Service - Port 5003
+- Original URL: http://cancellation-service:5003
+- Kong Route: /api/cancellation
+- Kong Route Configuration:
+  - Strip path: true
+  - Paths:
+    - /api/cancellation
+  - Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+  - Upstream URL: http://cancellation-service:5003
+
+# Cancellation Composite Endpoints:
+- GET /health → Kong: GET /api/cancellation/health
+- POST /cancellations → Kong: POST /api/cancellation/cancellations
+
+# Socket.IO Configuration
+- Kong Route: /socket.io
+- Kong Route Configuration:
+  - Strip path: false
+  - Paths:
+    - /socket.io
+  - Upstream URL: http://assign-picker-service:5005
+  - Note: WebSockets protocol must be enabled for this route

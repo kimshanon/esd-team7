@@ -35,8 +35,7 @@ services:
     command: "kong migrations bootstrap"
     restart: on-failure
     networks:
-      - esd-net:
-        external: true
+      - esd-net
     environment:
       KONG_DATABASE: postgres
       KONG_PG_HOST: kong-database
@@ -50,8 +49,7 @@ services:
     platform: linux/amd64
     restart: always
     networks:
-      - esd-net:
-        external: true
+      - esd-net
     environment:
       KONG_DATABASE: postgres
       KONG_PG_HOST: kong-database

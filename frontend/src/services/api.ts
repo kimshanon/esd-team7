@@ -1,8 +1,9 @@
 import axios from "axios";
 import { Stall, Restaurant, MenuItem, MenuItemFrontend, FoodListingsResponse, SingleFoodListingResponse, FoodListing } from "../types/types";
+import * as API from "@/config/api";
 
-const API_URL = "http://127.0.0.1:5002";
-const ORDER_API_URL = "http://127.0.0.1:5003";
+const API_URL = `${API.STALL_URL}`;
+const ORDER_API_URL = `${API.ORDER_URL}`;
 const FOOD_LISTINGS_API_URL = "https://personal-9l4pf9hj.outsystemscloud.com/FoodListingsAPI/rest/FoodListingAPI";
 
 

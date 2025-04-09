@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import { format } from "date-fns";
 import { Bike, Clock, MapPin, Package, DollarSign, Store } from "lucide-react";
+import * as API from "@/config/api";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -409,7 +410,7 @@ export default function PickerDashboard() {
       setLoading(true);
       try {
         // 1. Fetch available orders (orders with status "pending")
-        const pendingResponse = await axios.get("http://127.0.0.1:5003/orders");
+        const pendingResponse = await axios.get(`${API.ORDER_URL}/orders`);
         const pendingOrders = pendingResponse.data.filter(
           (order: any) => order.order_status === "pending" && !order.picker_id
         );
@@ -511,7 +512,7 @@ export default function PickerDashboard() {
 
             // If order_items is missing, fetch the complete order data
             axios
-              .get(`http://127.0.0.1:5003/orders/${orderData.order_id}`)
+              .get(`${API.ORDER_URL}/orders/${orderData.order_id}`)
               .then(async (response) => {
                 // Fetch stall information
                 const order = response.data;
@@ -571,7 +572,7 @@ export default function PickerDashboard() {
       if (data.picker_id === user?.id) {
         // Fetch the updated order details
         axios
-          .get(`http://127.0.0.1:5003/orders/${data.order_id}`)
+          .get(`${API.ORDER_URL}/orders/${data.order_id}`)
           .then((response) => {
             setActiveOrder(response.data);
             setActiveTab("active");
@@ -611,14 +612,14 @@ export default function PickerDashboard() {
       }
 
       // Update the order in the backend
-      await axios.post("http://127.0.0.1:5005/picker_accept", {
+      await axios.post(`${API.ASSIGN_PICKER_URL}/picker_accept`, {
         order_id: orderId,
         picker_id: user?.id,
       });
 
       // Fetch the updated order
       const response = await axios.get(
-        `http://127.0.0.1:5003/orders/${orderId}`
+        `${API.ORDER_URL}/orders/${orderId}`
       );
 
       // Update local state
@@ -641,14 +642,14 @@ export default function PickerDashboard() {
 
     try {
       // Update order status via the composite service instead of directly
-      await axios.post("http://127.0.0.1:5005/order_status", {
+      await axios.post(`${API.ASSIGN_PICKER_URL}/order_status`, {
         order_id: activeOrder.id,
         status: newStatus,
       });
 
       // Fetch the updated order
       const response = await axios.get(
-        `http://127.0.0.1:5003/orders/${activeOrder.id}`
+        `${API.ORDER_URL}/orders/${activeOrder.id}`
       );
       const updatedOrder = response.data;
 
@@ -673,7 +674,7 @@ export default function PickerDashboard() {
 
     try {
       // Call the API to update the order status back to "pending" and remove picker assignment
-      const response = await axios.post("http://127.0.0.1:5005/order_cancel", {
+      const response = await axios.post(`${API.ASSIGN_PICKER_URL}/order_cancel`, {
         order_id: activeOrder.id,
         picker_id: user?.id,
       });
@@ -688,7 +689,7 @@ export default function PickerDashboard() {
       // Refresh available orders after a short delay to allow the backend to update
       setTimeout(() => {
         axios
-          .get("http://127.0.0.1:5003/orders")
+          .get(`${API.ORDER_URL}/orders`)
           .then((response) => {
             const pendingOrders = response.data.filter(
               (order: any) =>

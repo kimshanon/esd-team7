@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import axios from "axios"
 import { User, CreditCard, Phone, Mail, Save, Edit, Loader2, Plus } from "lucide-react"
+import * as API from "@/config/api";
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -69,7 +70,7 @@ export default function ProfilePage() {
   const fetchCustomerData = async () => {
     try {
       setIsLoading(true)
-      const response = await axios.get(`http://localhost:5000/customers/${user?.id}`)
+      const response = await axios.get(`${API.CUSTOMER_URL}/customers/${user?.id}`)
       setCustomerData(response.data)
 
       // Initialize form data
@@ -92,7 +93,7 @@ export default function ProfilePage() {
     if (!user?.id) return;
 
     try {
-      const response = await axios.get(`http://localhost:5004/payments/customer/${user.id}`);
+      const response = await axios.get(`${API.PAYMENT_URL}/payments/customer/${user.id}`);
 
       if (response.data && Array.isArray(response.data)) {
         const payments = response.data;
@@ -145,7 +146,7 @@ export default function ProfilePage() {
       }
 
       // Update customer data
-      await axios.put(`http://localhost:5000/customers/${user?.id}`, updateData)
+      await axios.put(`${API.CUSTOMER_URL}/customers/${user?.id}`, updateData)
 
       // Refresh data
       await fetchCustomerData()
