@@ -10,7 +10,7 @@ services:
     volumes:
       - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
     networks:
-      - esd-network
+      - esd-net
       
   picker-service:
     build:
@@ -23,7 +23,7 @@ services:
     volumes:
       - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
     networks:
-      - esd-network
+      - esd-net
 
   stall-service:
     build:
@@ -36,7 +36,7 @@ services:
     volumes:
       - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
     networks:
-      - esd-network
+      - esd-net
       
   order-service:
     build:
@@ -49,7 +49,7 @@ services:
     volumes:
       - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
     networks:
-      - esd-network
+      - esd-net
       
   payment-service:
     build:
@@ -62,7 +62,7 @@ services:
     volumes:
       - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
     networks:
-      - esd-network
+      - esd-net
 
   calc-payment-service:
     build:
@@ -75,7 +75,7 @@ services:
     volumes:
       - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
     networks:
-      - esd-network
+      - esd-net
 
   # Add RabbitMQ for messaging between services
   rabbitmq:
@@ -84,7 +84,7 @@ services:
       - "5672:5672"
       - "15672:15672"
     networks:
-      - esd-network
+      - esd-net
   
   # Add assign_picker composite service
   assign-picker-service:
@@ -100,7 +100,7 @@ services:
       - order-service
       - picker-service
     networks:
-      - esd-network
+      - esd-net
   
   # Add updatelocation composite service
   update-location-service:
@@ -116,8 +116,8 @@ services:
     depends_on:
       - rabbitmq
     networks:
-      - esd-network
+      - esd-net
 
 networks:
-  esd-network:
-    driver: bridge
+  esd-net:
+    external: true

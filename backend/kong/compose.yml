@@ -1,0 +1,74 @@
+version: "3.9"
+
+volumes:
+  pgdata:
+    name: esd_pgdata
+
+networks:
+  esd-net:
+    external: true
+
+services:
+  kong-database:
+    image: postgres:17.4
+    platform: linux/amd64
+    restart: always
+    networks:
+      - esd-net
+    environment:
+      POSTGRES_DB: kong
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kong"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  kong-migration:
+    image: kong/kong-gateway:3.9
+    platform: linux/amd64
+    command: "kong migrations bootstrap"
+    restart: on-failure
+    networks:
+      - esd-net:
+        external: true
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: password
+    depends_on:
+      - kong-database
+
+  kong:
+    image: kong/kong-gateway:3.9
+    platform: linux/amd64
+    restart: always
+    networks:
+      - esd-net:
+        external: true
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: password
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_ADMIN_GUI_URL: http://localhost:8002
+      KONG_PORTAL: "true"
+      KONG_PORTAL_GUI_HOST: "localhost:8002"
+      KONG_RBAC: "off"  # Set to "off" if you don't want to manage RBAC tokens yet
+    depends_on:
+      - kong-migration
+    ports:
+      - "8000:8000"  # Public proxy
+      - "8001:8001"  # Admin API
+      - "8002:8002"  # Kong Manager
