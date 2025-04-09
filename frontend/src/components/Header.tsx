@@ -69,7 +69,7 @@ export default function Header() {
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2">
             <span className="text-2xl">🍔</span>
-            <span className="font-bold text-xl">FoodFast</span>
+            <span className="font-bold text-xl">SMOOeats</span>
           </Link>
 
           <nav className="hidden md:flex gap-6">
@@ -152,7 +152,7 @@ export default function Header() {
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <span className="text-2xl">🍔</span>
-                  <span className="font-bold text-xl">FoodFast</span>
+                  <span className="font-bold text-xl">SMOOeats</span>
                 </Link>
                 <nav className="flex flex-col gap-4">
                   {routes.map((route) => (

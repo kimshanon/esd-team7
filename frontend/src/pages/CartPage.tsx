@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Trash2, MapPin } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
+import * as API from "@/config/api";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,7 +83,7 @@ export default function CartPage() {
       // Instead of posting directly to the orders API, we'll post through
       // the assignment service to handle the WebSocket broadcasting
       const response = await axios.post(
-        "http://127.0.0.1:5005/orders", // This endpoint forwards to the order service and handles WebSocket
+        `${API.ORDER_URL}/orders`, // This endpoint forwards to the order service and handles WebSocket
         orderData
       );
 

@@ -7,6 +7,7 @@ import axios from "axios";
 import { signInWithEmailAndPassword } from "firebase/auth";
 // import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
+import * as API from "@/config/api";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -70,8 +71,8 @@ export default function LoginPage() {
       // Different endpoints based on user type
       const endpoint =
         userType === "customer"
-          ? `http://localhost:5000/customers/${firebaseUser.uid}`
-          : `http://localhost:5001/pickers/${firebaseUser.uid}`;
+          ? `${API.CUSTOMER_URL}/customers/${firebaseUser.uid}`
+          : `${API.PICKER_URL}/pickers/${firebaseUser.uid}`;
 
       // Fetch user data from our backend using the Firebase UID
       const response = await axios.get(endpoint);

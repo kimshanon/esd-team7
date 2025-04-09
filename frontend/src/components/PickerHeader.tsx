@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, LogOut, User, Bike } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { toast } from "sonner";
+import * as API from "@/config/api";
 
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
@@ -56,7 +57,7 @@ export default function PickerHeader() {
       setIsAvailable(checked);
       // Update availability in the backend
       await axios.patch(
-        `http://localhost:5001/pickers/${user?.id}/availability`,
+        `${API.PICKER_URL}/pickers/${user?.id}/availability`,
         {
           is_available: checked,
         }

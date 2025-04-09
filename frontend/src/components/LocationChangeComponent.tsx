@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
+import * as API from "@/config/api";
 
 interface Location {
   id: number
@@ -401,7 +402,7 @@ export default function LocationChangeComponent({
       setLoading(true);
 
       // Call the orders API directly - this matches the orders.py endpoint
-      const response = await fetch(`http://localhost:5003/orders/${orderId}/location`, {
+      const response = await fetch(`${API.ORDER_URL}/orders/${orderId}/location`, {
         method: "PATCH",
         headers: { 
           "Content-Type": "application/json",
@@ -414,25 +415,6 @@ export default function LocationChangeComponent({
 
       if (!response.ok) {
         throw new Error('Failed to update location');
-      }
-
-      // If you want to also call the second service, you can do that here
-      // This is the format for the update-location endpoint
-      try {
-        await fetch(`http://localhost:5002/update-location`, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-          },
-          body: JSON.stringify({
-            orderID: orderId,
-            location: newLocation,
-          }),
-        });
-      } catch (err) {
-        console.warn("Secondary location service update failed, but order was updated", err);
-        // Continue anyway since primary update was successful
       }
 
       setLoading(false);
@@ -530,13 +512,6 @@ export default function LocationChangeComponent({
           </div>
         </>
       )}
-
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

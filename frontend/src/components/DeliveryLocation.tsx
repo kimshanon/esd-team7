@@ -1,5 +1,6 @@
 /// <reference types="@types/google.maps" />
 
+import * as API from "@/config/api";
 import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 // import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
+// import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Define TypeScript interfaces
 interface LocationData {
@@ -418,7 +419,7 @@ function LocationChangeComponent({
       try {
         setLoading(true);
         const response = await fetch(
-          `http://localhost:5001/orders/${orderId}/location`,
+          `${API.ORDER_URL}/orders/${orderId}/location`,
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },

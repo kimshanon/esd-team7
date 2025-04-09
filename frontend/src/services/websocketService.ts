@@ -1,4 +1,5 @@
 import { io, Socket } from "socket.io-client";
+import * as API from "@/config/api";
 
 // WebSocket events we'll be listening for
 export const WS_EVENTS = {
@@ -25,7 +26,7 @@ class WebSocketService {
   }
 
   // Connect to the WebSocket server
-  connect(url: string = "http://localhost:5005") {
+  connect(url: string = `${API.ASSIGN_PICKER_URL}`) {
     if (this.socket) {
       console.log("WebSocket already connected");
       return;

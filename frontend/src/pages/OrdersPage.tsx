@@ -14,6 +14,7 @@ import axios from "axios";
 import { format } from "date-fns";
 import { useAppSelector } from "@/redux/hooks";
 import { toast } from "sonner";
+import * as API from "@/config/api";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -76,7 +77,7 @@ export default function OrdersPage() {
     try {
       setLoading(true);
       const response = await axios.get(
-        `http://127.0.0.1:5003/customers/${user.id}/orders`
+        `${API.CUSTOMER_URL}/customers/${user.id}/orders`
       );
 
       // Filter out completed orders and count them
