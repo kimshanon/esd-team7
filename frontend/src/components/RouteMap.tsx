@@ -7,14 +7,16 @@ interface RouteMapProps {
   onRouteCalculated?: (duration: string) => void;
 }
 
-export default function RouteMap({ startLocation, endLocation, polyline, onRouteCalculated }: RouteMapProps) {
+export default function RouteMap({ startLocation, endLocation, onRouteCalculated }: RouteMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
   const directionsService = useRef<google.maps.DirectionsService | null>(null);
   const directionsRenderer = useRef<google.maps.DirectionsRenderer | null>(null);
   const [estimatedTime, setEstimatedTime] = useState<string>("");
+  const [isMapInitialized, setIsMapInitialized] = useState<boolean>(false);
 
   useEffect(() => {
+    // Initialize map once
     const initMap = async () => {
       const loader = new Loader({
         apiKey: "AIzaSyDjH28uAStkeoEpvlVqtgt3OJk4_w74iRA",
@@ -46,40 +48,13 @@ export default function RouteMap({ startLocation, endLocation, polyline, onRoute
               strokeWeight: 5,
             },
           });
-
-          // Create route request
-          const request = {
-            origin: startLocation,
-            destination: endLocation,
-            travelMode: google.maps.TravelMode.WALKING,
-          };
-
-          // Get directions
-          directionsService.current.route(request, (result, status) => {
-            if (status === "OK" && directionsRenderer.current && result) {
-              directionsRenderer.current.setDirections(result);
-              
-              // Extract and display the duration
-              if (result.routes[0] && result.routes[0].legs[0]) {
-                const duration = result.routes[0].legs[0].duration?.text || "Unknown";
-                setEstimatedTime(duration);
-                
-                // Call the callback if provided
-                if (onRouteCalculated) {
-                  onRouteCalculated(duration);
-                }
-              }
-              
-              // Fit map to show the entire route
-              const bounds = new google.maps.LatLngBounds();
-              result.routes[0].bounds.getNorthEast();
-              result.routes[0].bounds.getSouthWest();
-              mapInstance.current?.fitBounds(result.routes[0].bounds);
-            }
-          });
+          
+          // Set map as initialized
+          setIsMapInitialized(true);
+          console.log("Map initialized successfully");
         }
       } catch (error) {
-        console.error("Error loading Google Maps:", error);
+        console.error("Error initializing Google Maps:", error);
       }
     };
 
@@ -91,7 +66,58 @@ export default function RouteMap({ startLocation, endLocation, polyline, onRoute
         directionsRenderer.current.setMap(null);
       }
     };
-  }, [startLocation, endLocation, polyline]);
+  }, []); // Empty dependency array means this only runs once
+
+  // Update route whenever locations change or map is initialized
+  useEffect(() => {
+    const updateRoute = async () => {
+      if (!isMapInitialized || !directionsService.current || !directionsRenderer.current || !mapInstance.current) {
+        console.log("Map not initialized yet, will try again when ready");
+        return;
+      }
+
+      console.log("Updating route with:", { startLocation, endLocation });
+
+      // Create route request
+      const request = {
+        origin: startLocation,
+        destination: endLocation,
+        travelMode: google.maps.TravelMode.WALKING,
+      };
+
+      // Get directions
+      directionsService.current.route(request, (result, status) => {
+        if (status === "OK" && directionsRenderer.current && result) {
+          console.log("Route calculated successfully");
+          directionsRenderer.current.setDirections(result);
+          
+          // Extract and display the duration
+          if (result.routes[0] && result.routes[0].legs[0]) {
+            const duration = result.routes[0].legs[0].duration?.text || "Unknown";
+            setEstimatedTime(duration);
+            
+            // Call the callback if provided
+            if (onRouteCalculated) {
+              onRouteCalculated(duration);
+            }
+          }
+          
+          // Fit map to show the entire route
+          const bounds = new google.maps.LatLngBounds();
+          result.routes[0].bounds.getNorthEast();
+          result.routes[0].bounds.getSouthWest();
+          mapInstance.current?.fitBounds(result.routes[0].bounds);
+        } else {
+          console.error("Error calculating route:", status);
+        }
+      });
+    };
+
+    if (startLocation && endLocation && isMapInitialized) {
+      console.log("Attempting to update route with initialized map");
+      updateRoute();
+    }
+  }, [startLocation, endLocation, onRouteCalculated, isMapInitialized]);
 
   return (
     <div className="w-full h-[400px] rounded-lg overflow-hidden relative">
