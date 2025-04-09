@@ -17,15 +17,15 @@ A student-run food delivery platform for SMU, allowing students to order from on
 <pre> <code>docker compose up --build</code> </pre>
 
 ## Test Accounts
-### Customer
+### Customer (Login as customer)
 Email: john123@gmail.com  
 Password: 12345678
 
-### Food Picker 1
+### Food Picker 1 (Login as food picker)
 Email: picker1@gmail.com  
 Password: 12345678
 
-### Food Picker 2
+### Food Picker 2 (Login as food picker)
 Email:picker2@gmail.com  
 Password: 12345678
 
