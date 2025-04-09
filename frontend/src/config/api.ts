@@ -5,7 +5,7 @@
  */
 
 // Base URL for all services
-export const API_BASE_URL = `http://localhost:8000`; // Using Kong's proxy port
+export const API_BASE_URL = `https://90e3-202-161-35-16.ngrok-free.app`; // Using Kong's proxy port
 
 // Service-specific endpoint URLs
 export const CUSTOMER_URL = `${API_BASE_URL}/api/customer`;
