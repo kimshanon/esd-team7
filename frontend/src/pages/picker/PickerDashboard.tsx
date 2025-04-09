@@ -414,32 +414,37 @@ export default function PickerDashboard() {
           (order: any) => order.order_status === "pending" && !order.picker_id
         );
 
-        // Fetch stall information for each pending order
-        const ordersWithStallInfo = await Promise.all(
-          pendingOrders.map(async (order: any) => {
-            try {
-              const stallResponse = await axios.get(
-                `https://personal-dcwqxa6n.outsystemscloud.com/SMUlivery/rest/FoodStallAPI/GetAllStalls`
-              );
-              // console.log('Order:', { id: order.id, stall_id: order.stall_id, type: typeof order.stall_id });
-              // console.log('Raw API Response:', JSON.stringify(stallResponse.data, null, 2));
-              // console.log('FoodStalls array:', JSON.stringify(stallResponse.data.FoodStalls, null, 2));
-              // Find the stall in the response that matches our stall_id
-              const stall = stallResponse.data.FoodStalls.find((s: any) => {
-                return Number(s.stall_id) === Number(order.stall_id);
-              });
-              if (!stall) throw new Error(`Stall ${order.stall_id} not found`);
-              return {
-                ...order,
-                stall_name: stall.stall_name,
-                stall_location: stall.stall_location,
-              };
-            } catch (error) {
-              console.error(`Error fetching stall info for order ${order.id}:`, error);
+        // Fetch all stall information once instead of for each order
+        let allStalls: any[] = [];
+        try {
+          const stallResponse = await axios.get(
+            `https://personal-dcwqxa6n.outsystemscloud.com/SMUlivery/rest/FoodStallAPI/GetAllStalls`
+          );
+          allStalls = stallResponse.data.FoodStalls || [];
+        } catch (error) {
+          console.error("Error fetching all stalls:", error);
+          toast.error("Failed to load stall information");
+        }
+
+        // Map stall information to each order
+        const ordersWithStallInfo = pendingOrders.map((order: any) => {
+          try {
+            // Find the stall in the cached response that matches our stall_id
+            const stall = allStalls.find((s: any) => Number(s.stall_id) === Number(order.stall_id));
+            if (!stall) {
+              console.warn(`Stall ${order.stall_id} not found for order ${order.id}`);
               return order;
             }
-          })
-        );
+            return {
+              ...order,
+              stall_name: stall.stall_name,
+              stall_location: stall.stall_location,
+            };
+          } catch (error) {
+            console.error(`Error processing stall info for order ${order.id}:`, error);
+            return order;
+          }
+        });
 
         setAvailableOrders(ordersWithStallInfo);
 
