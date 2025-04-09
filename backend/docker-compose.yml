@@ -51,6 +51,32 @@ services:
     networks:
       - esd-network
       
+  payment-service:
+    build:
+      context: .
+      dockerfile: ./atomic/Dockerfile.payment
+    ports:
+      - "5004:5004"  # You can change the port as needed
+    env_file:
+      - .env.docker
+    volumes:
+      - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
+    networks:
+      - esd-network
+
+  calc-payment-service:
+    build:
+      context: .
+      dockerfile: ./composite/Dockerfile.calc_payment
+    ports:
+      - "5009:5009"  # You can change the port as needed
+    env_file:
+      - .env.docker
+    volumes:
+      - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
+    networks:
+      - esd-network
+
   # Add RabbitMQ for messaging between services
   rabbitmq:
     image: rabbitmq:3-management

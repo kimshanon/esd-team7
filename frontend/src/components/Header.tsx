@@ -34,6 +34,7 @@ export default function Header() {
 
   const routes = [
     { href: "/", label: "Home" },
+    { href: "/special", label: "Deals" },
     { href: "/orders", label: "My Orders" },
   ];
 
@@ -121,7 +122,9 @@ export default function Header() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/profile")}>
                   <User className="mr-2 h-4 w-4" />
-                  Profile
+                  <Link to="/profile" className="hover:text-gray-600">
+                    Profile
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />

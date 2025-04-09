@@ -9,10 +9,12 @@ import CartPage from "./pages/CartPage";
 import OrdersPage from "./pages/OrdersPage";
 import OrderTrackingPage from "./pages/OrderTrackingPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import SpecialFoodListingsPage from "./pages/SpecialFoodListingsPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import PickerLayout from "./components/PickerLayout";
 import PickerDashboard from "./pages/picker/PickerDashboard";
 import { useAppSelector } from "./redux/hooks";
+import ProfilePage from "./pages/ProfilePage";
 
 function App() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
@@ -58,6 +60,7 @@ function App() {
         {/* Regular customer routes */}
         <Route index element={<RestaurantsPage />} />
         <Route path="restaurants/:id" element={<RestaurantDetailPage />} />
+        <Route path="special" element={<SpecialFoodListingsPage />} />
         <Route
           path="cart"
           element={
@@ -79,6 +82,14 @@ function App() {
           element={
             <ProtectedRoute>
               <OrderTrackingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           }
         />
