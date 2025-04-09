@@ -3,15 +3,14 @@ from firebase_admin import credentials, firestore
 from flask import Flask, request, jsonify
 import requests
 import pika
+import os
 
 app = Flask(__name__)
 
-try:
-    cred = credentials.Certificate("../../firebase-adminsdk.json")
+if not firebase_admin._apps:
+    cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
+    cred = credentials.Certificate(cred_path)
     firebase_admin.initialize_app(cred)
-    db = firestore.client()
-except Exception as e:
-    print(f"Error initializing Firebase: {e}")
 
 # RabbitMQ Configuration
 RABBITMQ_HOST = 'localhost'  # Change if RabbitMQ is hosted elsewhere
