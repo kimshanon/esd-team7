@@ -28,12 +28,12 @@ def test():
 def options_handler(path=None):
     return make_response('', 200)
 
-# Configuration
-RABBITMQ_HOST = "localhost"  # Use Docker service name
+# Configuration - Use environment variables instead of hardcoded values
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
 EXCHANGE_NAME = "order_delivery_exchange"
 EXCHANGE_TYPE = "fanout"
-ORDER_SERVICE_URL = "http://localhost:5003"  # Order microservice URL
-PICKER_SERVICE_URL = "http://localhost:5001"  # Picker microservice URL
+ORDER_SERVICE_URL = os.getenv("ORDER_SERVICE_URL", "http://localhost:5003")
+PICKER_SERVICE_URL = os.getenv("PICKER_SERVICE_URL", "http://localhost:5001")
 
 # Track active pickers and their socket IDs
 active_pickers = {}
@@ -707,4 +707,6 @@ def test_route():
 # MAIN
 if __name__ == "__main__":
     print("Starting Assign Picker service...")
-    socketio.run(app, debug=True, host="0.0.0.0", port=5005)
+    # Get port from environment variable or use default 5005
+    port = int(os.getenv("PORT", 5005))
+    socketio.run(app, debug=True, host="0.0.0.0", port=port)
