@@ -93,6 +93,7 @@ export default function OrderTrackingPage() {
   const [pickerInfo, setPickerInfo] = useState<{ picker_name?: string } | null>(
     null
   );
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   // Create a fetchOrderDetails function that can be reused
   const fetchOrderDetails = useCallback(async () => {

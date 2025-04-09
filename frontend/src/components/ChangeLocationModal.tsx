@@ -39,9 +39,6 @@ export default function ChangeLocationModal({
               <MapPin className="h-5 w-5 mr-2 text-primary" />
               Change Delivery Location
             </DialogTitle>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full">
-              <X className="h-4 w-4" />
-            </Button>
           </div>
         </DialogHeader>
 

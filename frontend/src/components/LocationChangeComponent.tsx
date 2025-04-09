@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 
@@ -451,9 +449,9 @@ export default function LocationChangeComponent({
   return (
     <div className="font-sans">
       {/* Google Maps Container */}
-      <div ref={mapContainerRef} className="h-[400px] w-full bg-gray-100 relative">
+      <div ref={mapContainerRef} className="h-[400px] w-full relative">
         {!mapLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
               <div className="w-10 h-10 border-4 border-gray-200 border-t-primary rounded-full animate-spin mx-auto mb-2" />
               <p>Loading map...</p>
@@ -522,7 +520,7 @@ export default function LocationChangeComponent({
             </div>
           </div>
 
-          <div className="p-4 border-t bg-gray-50 flex gap-3">
+          <div className="p-4 border-t flex gap-3">
             <Button onClick={handleConfirmLocation} disabled={!selectedLocation || loading} className="flex-1">
               {loading ? "Updating..." : "Confirm New Location"}
             </Button>

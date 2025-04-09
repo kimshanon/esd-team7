@@ -285,7 +285,9 @@ def create_order():
         
         if not order_data:
             return jsonify({"error": "Missing order data"}), 400
-            
+        
+        # Deduct payment from customer first
+
         # Calls the ORDER MS to create a new order
         print(f"Sending to order service: {ORDER_URL}")
         response = requests.post(ORDER_URL, json=order_data)
