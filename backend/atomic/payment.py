@@ -5,6 +5,10 @@ from firebase_admin import credentials, firestore
 from flask import Flask, request, jsonify
 import os
 from datetime import datetime
+import sys
+
+from pydantic import ValidationError
+from models.payment_model import PaymentModel
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -49,9 +53,27 @@ def update_payment_status(payment_id):
         return jsonify({"code": 400, "message": "Payment status is required."}), 400
 
     payment_ref = db.collection('payments').document(payment_id)
-    payment_ref.update({"payment_status": new_status})
-
-    return jsonify({"code": 200, "message": f"Payment {payment_id} status updated to {new_status}."}), 200
+    payment_doc = payment_ref.get()
+    
+    if not payment_doc.exists:
+        return jsonify({"code": 404, "message": f"Payment {payment_id} not found."}), 404
+        
+    try:
+        # Get current payment data
+        payment_data = payment_doc.to_dict()
+        
+        # Update only the status field
+        payment_data['payment_status'] = new_status
+        
+        # Validate the updated payment data
+        payment_model = PaymentModel(**payment_data)
+        
+        payment_ref.update({"payment_status": new_status})
+        
+        return jsonify({"code": 200, "message": f"Payment {payment_id} status updated to {new_status}."}), 200
+    
+    except ValidationError as e:
+        return jsonify({"code": 400, "message": f"Invalid payment data: {str(e)}"}), 400
 
 # Get specific payment with payment_status
 @app.route("/payment/<payment_id>", methods=['GET'])
@@ -84,69 +106,45 @@ def get_payment_details(payment_id):
 # Create a new payment transaction
 @app.route('/payment', methods=['POST'])
 def create_payment_transaction():
-    data = request.get_json()
-    
-    # Define common required fields for both scenarios.
-    common_required = [
-        "log_id", 
-        "customer_id", 
-        "event_type", 
-        "event_details", 
-        "payment_amount", 
-        "payment_status", 
-        "timestamp"
-    ]
-    
-    # Check for missing common fields.
-    missing_common = [field for field in common_required if field not in data]
-    if missing_common:
-        return jsonify({"error": f"Missing required field(s): {', '.join(missing_common)}"}), 400
-
-    event_type = data.get("event_type")
-    
-    # For order payments, require "order_id".
-    if event_type == "Payment":
-        if "order_id" not in data:
-            return jsonify({"error": "Missing required field: order_id for Payment events"}), 400
-    else:
-        # For Credit Top-Up, remove the order_id if it exists, since it's not applicable.
-        data.pop("order_id", None)
-    
-    # Validate payment_amount is a positive number.
     try:
-        amount = float(data["payment_amount"])
-        if amount <= 0:
-            return jsonify({"error": "payment_amount must be greater than zero"}), 400
-    except (ValueError, TypeError):
-        return jsonify({"error": "payment_amount must be a valid number"}), 400
-
-    # Build the payment transaction record.
-    payment_data = {
-        "log_id": data["log_id"],
-        "customer_id": data["customer_id"],
-        "event_type": event_type,
-        "event_details": data["event_details"],
-        "payment_amount": amount,
-        "payment_status": data["payment_status"],
-        "timestamp": data["timestamp"],
-    }
-
-    # Include order_id only if event_type is "Payment"
-    if event_type == "Payment":
-        payment_data["order_id"] = data["order_id"]
-
-    # Create a new document in the 'payments' collection.
-    payment_ref = db.collection('payments').document()
-    # Add the Firestore document ID to the payment data as payment_id.
-    payment_data["payment_id"] = payment_ref.id
-
-    payment_ref.set(payment_data)
-
-    return jsonify({
-        "message": "Payment transaction created successfully.",
-        "transaction_id": payment_ref.id,
-        "payment_data": payment_data
-    }), 201
+        data = request.get_json()
+        
+        # Check if timestamp is present, if not add current time
+        if "timestamp" not in data:
+            data["timestamp"] = datetime.now().isoformat()
+        
+        # Convert string timestamp to datetime object if necessary
+        if isinstance(data.get("timestamp"), str):
+            try:
+                data["timestamp"] = datetime.fromisoformat(data["timestamp"])
+            except ValueError:
+                data["timestamp"] = datetime.now()
+        
+        # Validate payment data using the PaymentModel
+        payment_model = PaymentModel(**data)
+        
+        # Create a new document in the 'payments' collection
+        payment_ref = db.collection('payments').document()
+        
+        # Get dictionary representation for Firestore
+        payment_data = payment_model.to_dict()
+        
+        # Add the Firestore document ID to the payment data
+        payment_data["payment_id"] = payment_ref.id
+        
+        # Save to Firestore
+        payment_ref.set(payment_data)
+        
+        return jsonify({
+            "message": "Payment transaction created successfully.",
+            "transaction_id": payment_ref.id,
+            "payment_data": payment_data
+        }), 201
+        
+    except ValidationError as e:
+        return jsonify({"error": f"Validation error: {str(e)}"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Error creating payment transaction: {str(e)}"}), 500
 
 # Delete a payment
 @app.route("/payments/<paymentID>", methods=['DELETE'])
@@ -172,9 +170,10 @@ def get_payments_by_customer_id(customer_id):
         # Collect payments from query and format them into a list
         payment_list = []
         for payment in payments:
-            payment_list.append(payment.to_dict())
+            payment_data = payment.to_dict()
+            payment_list.append(payment_data)
 
-        return jsonify(payment_list), 200  # Return only the list of payments
+        return jsonify(payment_list), 200
     except Exception as e:
         print(f"Error fetching payments: {e}")
         return jsonify({"error": "Could not fetch payments"}), 500

@@ -7,6 +7,7 @@ import RestaurantsPage from "./pages/RestaurantsPage";
 import RestaurantDetailPage from "./pages/RestaurantDetailPage";
 import CartPage from "./pages/CartPage";
 import OrdersPage from "./pages/OrdersPage";
+import CompletedOrdersPage from "./pages/CompletedOrdersPage";
 import OrderTrackingPage from "./pages/OrderTrackingPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import SpecialFoodListingsPage from "./pages/SpecialFoodListingsPage";
@@ -74,6 +75,14 @@ function App() {
           element={
             <ProtectedRoute>
               <OrdersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="orders/completed"
+          element={
+            <ProtectedRoute>
+              <CompletedOrdersPage />
             </ProtectedRoute>
           }
         />

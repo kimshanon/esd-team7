@@ -56,6 +56,74 @@ def get_customer(customer_id):
     customer['id'] = doc.id
     return jsonify(customer), 200
 
+# GET a customer's credit balance
+@app.route('/customers/<customer_id>/credits', methods=['GET'])
+def get_customer_credits(customer_id):
+    """Retrieve the credit balance for a specific customer"""
+    doc_ref = db.collection('customers').document(customer_id)
+    doc = doc_ref.get()
+    
+    if not doc.exists:
+        abort(404, description="Customer not found")
+    
+    customer_data = doc.to_dict()
+    return jsonify({
+        "customer_id": customer_id,
+        "customer_name": customer_data.get('customer_name'),
+        "customer_credits": customer_data.get('customer_credits', 0)
+    }), 200
+
+# PATCH to update customer credits
+@app.route('/customers/<customer_id>/credits', methods=['PATCH'])
+def update_customer_credits(customer_id):
+    """Update a customer's credit balance by adding/subtracting the specified amount"""
+    doc_ref = db.collection('customers').document(customer_id)
+    doc = doc_ref.get()
+    
+    if not doc.exists:
+        abort(404, description="Customer not found")
+    
+    data = request.get_json()
+    if not data or 'amount' not in data:
+        abort(400, description="Request must include 'amount' field")
+    
+    try:
+        # Get the amount to add/subtract (can be negative for deductions)
+        amount = float(data['amount'])
+        
+        # Get the current customer data
+        current_data = doc.to_dict()
+        current_credits = current_data.get('customer_credits', 0)
+        
+        # Calculate new credit balance
+        new_credits = current_credits + amount
+        
+        # Prevent negative balance if needed
+        if new_credits < 0 and not data.get('allow_negative', False):
+            abort(400, description="Operation would result in negative credits")
+        
+        # Update the customer's credits
+        current_data.update({'customer_credits': new_credits})
+        
+        # Validate the updated data with Pydantic
+        updated_customer = CustomerModel(**current_data)
+        
+        # Update just the credits field in Firestore
+        doc_ref.update({'customer_credits': new_credits})
+        
+        # Return success response with updated credit information
+        return jsonify({
+            "customer_id": customer_id,
+            "previous_credits": current_credits,
+            "amount_changed": amount,
+            "new_credits": new_credits
+        }), 200
+        
+    except ValueError:
+        abort(400, description="Amount must be a number")
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
+
 # POST a new customer
 @app.route('/customers', methods=['POST'])
 def create_customer():
@@ -135,88 +203,6 @@ def delete_customer(customer_id):
     
     doc_ref.delete()
     return jsonify({"message": f"Customer {customer_id} deleted"}), 200
-
-
-# Add credits to a customer account
-@app.route('/customers/<customer_id>/add-credits', methods=['POST', 'OPTIONS'])
-def add_customer_credits(customer_id):
-    if request.method == 'OPTIONS':
-        return make_response('', 200)
-
-    data = request.json
-    if not data or 'amount' not in data:
-        abort(400, description="Missing amount in request body")
-    
-    # Validate amount is a positive number
-    try:
-        amount = float(data['amount'])
-        if amount <= 0:
-            abort(400, description="Amount must be greater than zero")
-    except ValueError:
-        abort(400, description="Amount must be a valid number")
-    
-    doc_ref = db.collection('customers').document(customer_id)
-    doc = doc_ref.get()
-    if not doc.exists:
-        abort(404, description="Customer not found")
-    
-    # Get current data
-    current_data = doc.to_dict()
-    current_credits = current_data.get('customer_credits', 0)
-    
-    # Update credits
-    new_credits = current_credits + amount
-    
-    # Update the document with new credits
-    doc_ref.update({'customer_credits': new_credits})
-    
-    # Return updated credits
-    return jsonify({
-        'previous_credits': current_credits,
-        'added_amount': amount,
-        'new_credits': new_credits
-    }), 200
-
-@app.route('/customers/<customer_id>/deduct-credits', methods=['POST'])
-def deduct_customer_credits(customer_id):
-    data = request.json
-    if not data or 'amount' not in data:
-        abort(400, description="Missing amount in request body")
-    
-    # Validate amount is a positive number
-    try:
-        amount = float(data['amount'])
-        if amount <= 0:
-            abort(400, description="Amount must be greater than zero")
-    except ValueError:
-        abort(400, description="Amount must be a valid number")
-    
-    doc_ref = db.collection('customers').document(customer_id)
-    doc = doc_ref.get()
-    if not doc.exists:
-        abort(404, description="Customer not found")
-    
-    # Get current data
-    current_data = doc.to_dict()
-    current_credits = current_data.get('customer_credits', 0)
-    
-    # Check if customer has enough credits
-    if current_credits < amount:
-        abort(400, description="Insufficient credits")
-    
-    # Update credits
-    new_credits = current_credits - amount
-    
-    # Update the document with new credits
-    doc_ref.update({'customer_credits': new_credits})
-    
-    # Return updated credits
-    return jsonify({
-        'previous_credits': current_credits,
-        'deducted_amount': amount,
-        'new_credits': new_credits
-    }), 200
-
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
