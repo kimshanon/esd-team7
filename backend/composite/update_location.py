@@ -61,6 +61,10 @@ def get_route_details(origin, destination):
         print(f"Error fetching route details: {response.text}")
         return None
 
+# Test
+@app.route('/test', methods=['GET'])
+def test():
+    return "Update Location is running"
 
 # Update Location Endpoint
 @app.route('/update-location', methods=['POST'])

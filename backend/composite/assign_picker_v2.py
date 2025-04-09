@@ -7,12 +7,20 @@ import threading
 import requests
 import time
 from dotenv import load_dotenv
+import os
+import sys
+import eventlet
 
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
+# Test
+@app.route('/test', methods=['GET'])
+def test():
+    return "Assign Picker is running"
 
 # This is for the CORS Error where they need pre-flight check to see if it exists or something
 @app.route('/<path:path>', methods=['OPTIONS'])
@@ -31,6 +39,35 @@ PICKER_SERVICE_URL = "http://localhost:5001"  # Picker microservice URL
 active_pickers = {}
 # Track orders waiting for pickup
 pending_orders = {}
+
+# URLs for the other microservices
+ORDER_URL = f"{ORDER_SERVICE_URL}/orders"
+PICKER_URL = f"{PICKER_SERVICE_URL}/pickers"
+
+# WebSocket event names
+WS_ORDER_WAITING = "order_waiting"
+WS_ORDER_TAKEN = "order_taken"
+WS_PICKER_UPDATE = "picker_update"
+WS_REGISTER_PICKER = "register_picker"
+WS_REGISTER_CUSTOMER = "register_customer"
+WS_TEST_EVENT = "test_event"
+WS_TEST_RESPONSE = "test_response"
+
+# Keep track of connected pickers and customers
+connected_pickers = {}  # picker_id -> sid
+customer_orders = {}    # customer_id -> list of order_ids
+order_customers = {}    # order_id -> customer_id
+
+# Helper function to get order details
+def get_order_details(order_id):
+    try:
+        response = requests.get(f"{ORDER_URL}/{order_id}")
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception as e:
+        print(f"Error getting order details: {e}")
+        return None
 
 # =========================================================================
 # Subscribe to RabbitMQ Exchange
@@ -99,7 +136,7 @@ def handle_picker_acceptance(message):
     # Send PATCH Request to update order status
     try:
         response = requests.patch(
-            f"{ORDER_SERVICE_URL}/orders/{order_id}/status",
+            f"{ORDER_URL}/{order_id}/status",
             json={
                 "order_status": "assigned",
                 "picker_id": picker_id
@@ -124,21 +161,30 @@ def handle_picker_acceptance(message):
         print(f"Order {order_id} not found in pending orders")
     
     # Notify all pickers that this order is taken
-    socketio.emit("order_taken", {
+    socketio.emit(WS_ORDER_TAKEN, {
         "order_id": order_id,
         "picker_id": picker_id,
         "status": "assigned"
-    }, room="pickers")
+    })  # Changed from room="pickers" t for compatibility
     print(f"Notified all pickers that order {order_id} was taken by picker {picker_id}")
     
     # Notify the customer if they're connected
-    customer_room = f"customer_{order_id}"
-    socketio.emit("picker_update", {
-        "order_id": order_id,
-        "picker_id": picker_id,
-        "status": "assigned"
-    }, room=customer_room)
-    print(f"Notified customer in room '{customer_room}' about picker assignment")
+    if order_id in order_customers:
+        customer_id = order_customers[order_id]
+        
+        # Get the full order details to include in notification
+        order_details = get_order_details(order_id)
+        
+        # Emit the picker update event
+        socketio.emit(WS_PICKER_UPDATE, {
+            "order_id": order_id,
+            "customer_id": customer_id,
+            "picker_id": picker_id,
+            "status": "assigned",
+            "details": order_details
+        })  # This ensures all clients get the update
+        
+        print(f"Notified customer {customer_id} that order {order_id} was accepted")
 
 # =========================================================================
 # 3. Handle new order
@@ -157,13 +203,17 @@ def handle_new_order(message):
     pending_orders[order_id] = order_data
     
     # Broadcast to all active pickers
-    socketio.emit("order_waiting", {
+    socketio.emit(WS_ORDER_WAITING, {
         "order_id": order_id,
         "status": "pending",
         "details": order_data
-    }, room="pickers")
+    })  # Changed from room="pickers" t
     
-    print(f"Broadcasted new order {order_id} to pickers room")
+    print(f"Broadcasted new order {order_id} to all connected clients")
+    
+    # If this is an order returned to pending, use the message type to differentiate
+    if message.get("type") == "order_returned_to_pending":
+        print(f"Order {order_id} returned to pending state")
 
 # =========================================================================
 # 4. Handle Order Cancellation
@@ -186,8 +236,8 @@ def handle_order_cancelled(message):
     # Notify all pickers
     socketio.emit("order_cancelled", {
         "order_id": order_id
-    }, room="pickers")
-    print(f"Notified all pickers that order {order_id} was cancelled")
+    })  # Changed from room="pickers" t
+    print(f"Notified all clients that order {order_id} was cancelled")
 
 # =========================================================================
 # 5. Publish to RabbitMQ Exchange the message
@@ -222,7 +272,7 @@ rabbitmq_thread.daemon = True
 rabbitmq_thread.start()
 
 # =========================================================================
-# 7. create a new order endpoint
+# 7. create a new order endpoint - MERGED THE TWO FUNCTIONS
 # =========================================================================
 @app.route("/orders", methods=["POST"])
 def create_order():
@@ -237,8 +287,8 @@ def create_order():
             return jsonify({"error": "Missing order data"}), 400
             
         # Calls the ORDER MS to create a new order
-        print(f"Sending to order service: {ORDER_SERVICE_URL}/orders")
-        response = requests.post(f"{ORDER_SERVICE_URL}/orders", json=order_data)
+        print(f"Sending to order service: {ORDER_URL}")
+        response = requests.post(ORDER_URL, json=order_data)
         print(f"Order service response: {response.status_code}")
         
         if response.status_code != 201:
@@ -253,6 +303,11 @@ def create_order():
         pending_orders[order_id] = new_order
         print(f"Added order {order_id} to pending orders")
         
+        # Get customer ID for WebSocket notifications
+        customer_id = order_data.get("customer_id")
+        if customer_id:
+            order_customers[order_id] = customer_id
+        
         # Broadcast the new order to pickers
         message = {
             "order_id": order_id,
@@ -260,25 +315,22 @@ def create_order():
             "type": "new_order"
         }
         
-        # Directly emit to the pickers room via Socket.IO
+        # Directly emit to all clients via Socket.IO
         socketio.emit(
-            "order_waiting",
+            WS_ORDER_WAITING,
             {
                 "order_id": order_id,
                 "status": "pending",
                 "details": new_order
             },
-            room="pickers"
+            
         )
-        print(f"Directly emitted order_waiting event to pickers room")
+        print(f"Directly emitted order_waiting event to all clients")
         
         print(f"Publishing to RabbitMQ: {message}")
         publish_to_rabbitmq(message)
         
-        return jsonify({
-            "message": "Order created and broadcast to pickers",
-            "order_id": order_id
-        }), 201
+        return jsonify(new_order), 201
     
     except Exception as e:
         print(f"Error in create_order: {str(e)}")
@@ -300,7 +352,20 @@ def picker_accept():
         
         if not order_id or not picker_id:
             return jsonify({"error": "Missing order_id or picker_id"}), 400
-            
+        
+        # Directly update order via the ORDER API
+        order_update = {
+            "picker_id": picker_id,
+            "order_status": "assigned"
+        }
+        
+        update_response = requests.put(f"{ORDER_URL}/{order_id}", json=order_update)
+        
+        if update_response.status_code != 200:
+            return jsonify({"error": "Failed to update order"}), update_response.status_code
+        
+        updated_order = update_response.json()
+        
         # Publish the acceptance to RabbitMQ
         message = {
             "order_id": order_id,
@@ -308,8 +373,9 @@ def picker_accept():
             "type": "picker_acceptance"
         }
         
+        # Publish to RabbitMQ and handle the event
         if publish_to_rabbitmq(message):
-            # Let all the picker and customer know order is accepted
+            # Let all the pickers and customer know order is accepted
             handle_picker_acceptance(message)
             
             return jsonify({
@@ -325,7 +391,58 @@ def picker_accept():
         return jsonify({"error": f"Failed to process acceptance: {str(e)}"}), 500
 
 # =========================================================================
-# 9. Customer cancel order endpoint
+# 9. Order status update endpoint
+# =========================================================================
+@app.route("/order_status", methods=["POST"])
+def update_order_status():
+    """Update an order's status and notify relevant parties"""
+    try:
+        data = request.json
+        
+        if not data or 'order_id' not in data or 'status' not in data:
+            return jsonify({"error": "Missing required fields"}), 400
+        
+        order_id = data['order_id']
+        new_status = data['status']
+        
+        # Update the order status in the orders microservice
+        status_update = {"order_status": new_status}
+        
+        if new_status == "completed":
+            status_update["order_completed"] = True
+            
+        status_response = requests.patch(f"{ORDER_URL}/{order_id}/status", json=status_update)
+        
+        if status_response.status_code != 200:
+            return jsonify({"error": "Failed to update order status"}), status_response.status_code
+        
+        updated_order = status_response.json()
+        
+        # Notify the customer about the status update
+        if order_id in order_customers:
+            customer_id = order_customers[order_id]
+            
+            # Get the full order details
+            order_details = get_order_details(order_id)
+            
+            # Emit the picker update event
+            socketio.emit(WS_PICKER_UPDATE, {
+                "order_id": order_id,
+                "customer_id": customer_id,
+                "status": new_status,
+                "details": order_details
+            })
+            
+            print(f"Notified clients that order {order_id} status is now {new_status}")
+        
+        return jsonify({"status": "success", "message": f"Order status updated to {new_status}"}), 200
+    
+    except Exception as e:
+        print(f"Error in update_order_status: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# =========================================================================
+# 10. Customer cancel order endpoint
 # =========================================================================
 @app.route("/orders/<order_id>/cancel", methods=["POST"])
 def cancel_order(order_id):
@@ -333,7 +450,7 @@ def cancel_order(order_id):
     try:
         # Update the order status in the order service
         response = requests.patch(
-            f"{ORDER_SERVICE_URL}/orders/{order_id}/status",
+            f"{ORDER_URL}/{order_id}/status",
             json={"order_status": "cancelled"}
         )
         
@@ -362,7 +479,7 @@ def cancel_order(order_id):
         return jsonify({"error": f"Failed to process cancellation: {str(e)}"}), 500
 
 # =========================================================================
-# 10. Endpoint to get pending orders for picker to see
+# 11. Endpoint to get pending orders for picker to see
 # =========================================================================
 @app.route("/debug/pending_orders", methods=["GET"])
 def debug_pending_orders():
@@ -373,7 +490,7 @@ def debug_pending_orders():
     })
 
 # =========================================================================
-# 11. Endpoint to get active pickers (Not that necessary)
+# 12. Endpoint to get active pickers (Not that necessary)
 # =========================================================================
 @app.route("/debug/active_pickers", methods=["GET"])
 def debug_active_pickers():
@@ -383,9 +500,8 @@ def debug_active_pickers():
         "pickers": active_pickers
     })
 
-
 # =========================================================================
-# 12. Websocket endpoints for UI to interact with
+# 13. Websocket endpoints for UI to interact with
 # =========================================================================
 @socketio.on("connect")
 def handle_connect():
@@ -403,12 +519,19 @@ def handle_disconnect():
             print(f"Removing picker {picker_id} from active pickers")
             active_pickers.pop(picker_id)
             break
+    
+    # Also check for connected_pickers from the WebSocket approach
+    for picker_id, sid in list(connected_pickers.items()):
+        if sid == request.sid:
+            print(f"Removing picker {picker_id} from connected pickers")
+            del connected_pickers[picker_id]
+            break
 
 # =========================================================================
-# 13. Register Picker and Customer and Test
+# 14. Register Picker and Customer and Test via WebSocket
 # =========================================================================
-@socketio.on("register_picker")
-def register_picker(data):
+@socketio.on(WS_REGISTER_PICKER)
+def handle_register_picker(data):
     """Register a picker for receiving order notifications"""
     picker_id = data.get("picker_id")
     if not picker_id:
@@ -416,64 +539,172 @@ def register_picker(data):
     
     print(f"Picker {picker_id} registering with socket ID {request.sid}")
     
-    # Add to active pickers
+    # Store in both picker tracking dictionaries for compatibility
     active_pickers[picker_id] = request.sid
+    connected_pickers[picker_id] = request.sid
     
-    # Join the pickers room to receive broadcasts
-    join_room("pickers")
-    print(f"Picker {picker_id} joined 'pickers' room")
-    
-    # Important: Send all currently pending orders to this newly connected picker
+    # Send all currently pending orders to this newly connected picker
     print(f"Sending {len(pending_orders)} pending orders to picker {picker_id}")
     
     if pending_orders:
         for order_id, order_data in pending_orders.items():
             print(f"Sending pending order {order_id} to picker {picker_id}")
             # Send directly to this picker only (not broadcast to all)
-            emit("order_waiting", {
+            socketio.emit(WS_ORDER_WAITING, {
                 "order_id": order_id,
                 "status": "pending",
                 "details": order_data
-            })
+            }, room=request.sid)
     else:
         print("No pending orders to send")
     
     print(f"Picker {picker_id} registration complete")
 
-@socketio.on("register_customer")
-def register_customer(data):
+@socketio.on(WS_REGISTER_CUSTOMER)
+def handle_register_customer(data):
     """Register a customer for updates on their order"""
     customer_id = data.get("customer_id")
     order_id = data.get("order_id")
     
     if customer_id and order_id:
-        customer_room = f"customer_{order_id}"
-        join_room(customer_room)
-        print(f"Customer {customer_id} joined room '{customer_room}' for order {order_id}")
+        # Store the customer's session ID for this order
+        if customer_id not in customer_orders:
+            customer_orders[customer_id] = []
+        
+        if order_id not in customer_orders[customer_id]:
+            customer_orders[customer_id].append(order_id)
+        
+        # Map order to customer for easier lookup
+        order_customers[order_id] = customer_id
+        
+        print(f"Registered customer {customer_id} for order {order_id}")
+        print(f"Customer orders: {customer_orders}")
+        print(f"Order customers: {order_customers}")
         
         # Check if order is already assigned to a picker
         try:
-            response = requests.get(f"{ORDER_SERVICE_URL}/orders/{order_id}")
+            response = requests.get(f"{ORDER_URL}/{order_id}")
             if response.status_code == 200:
                 order_data = response.json()
-                if order_data.get("order_status") == "assigned" and order_data.get("picker_id"):
-                    # Send current picker information to the customer
-                    emit("picker_update", {
+                if order_data.get("order_status") != "pending" and order_data.get("picker_id"):
+                    # Send current order information to the customer
+                    socketio.emit(WS_PICKER_UPDATE, {
                         "order_id": order_id,
+                        "customer_id": customer_id,
                         "picker_id": order_data.get("picker_id"),
-                        "status": "assigned"
-                    })
-                    print(f"Sent existing picker assignment to customer for order {order_id}")
+                        "status": order_data.get("order_status"),
+                        "details": order_data
+                    }, room=request.sid)
+                    print(f"Sent existing order status to customer for order {order_id}")
         except Exception as e:
             print(f"Error checking order status: {str(e)}")
 
-@socketio.on("test_event")
+@socketio.on(WS_TEST_EVENT)
 def handle_test_event(data):
     """Handle test event from client"""
     print(f"Received test event: {data}")
-    emit("test_response", {"message": "Server received your test"})
+    socketio.emit(WS_TEST_RESPONSE, {"message": "Server received your test"}, room=request.sid)
+
+# =========================================================================
+# Add a new endpoint to handle order cancellation by a picker
+# =========================================================================
+@app.route("/order_cancel", methods=["POST"])
+def cancel_order_assignment():
+    """Cancel a picker's assignment to an order and revert to pending status"""
+    try:
+        data = request.json
+        
+        if not data or 'order_id' not in data or 'picker_id' not in data:
+            return jsonify({"error": "Missing required fields"}), 400
+        
+        order_id = data['order_id']
+        picker_id = data['picker_id']
+        
+        # Check if the order exists and is assigned to this picker
+        order_response = requests.get(f"{ORDER_URL}/{order_id}")
+        if order_response.status_code != 200:
+            return jsonify({"error": "Order not found"}), 404
+        
+        order_data = order_response.json()
+        if str(order_data.get("picker_id")) != str(picker_id):
+            return jsonify({"error": "Order not assigned to this picker"}), 403
+        
+        if order_data.get("order_status") != "assigned":
+            return jsonify({"error": "Order cannot be cancelled in its current status"}), 400
+        
+        # Update the order: set status to pending and remove picker_id
+        # Use PATCH to update status and picker_id
+        update_data = {
+            "order_status": "pending",
+            "picker_id": None  # Remove picker assignment
+        }
+        
+        update_response = requests.patch(f"{ORDER_URL}/{order_id}/status", json=update_data)
+        if update_response.status_code != 200:
+            return jsonify({"error": f"Failed to update order: {update_response.text}"}), 500
+        
+        # After successful update, fetch the complete order details to ensure all fields are present
+        complete_order_response = requests.get(f"{ORDER_URL}/{order_id}")
+        if complete_order_response.status_code != 200:
+            return jsonify({"error": "Failed to get complete order details"}), 500
+            
+        updated_order = complete_order_response.json()
+        
+        # Add this order back to pending orders
+        pending_orders[order_id] = updated_order
+        
+        # Create a message for RabbitMQ
+        message = {
+            "order_id": order_id,
+            "picker_id": picker_id,
+            "type": "order_returned_to_pending",
+            "order_data": updated_order
+        }
+        
+        # Publish to RabbitMQ
+        publish_to_rabbitmq(message)
+        
+        # Emit multiple events to ensure all components update properly
+        
+        # 1. Notify all pickers that this order is available again - use order_waiting event
+        socketio.emit(WS_ORDER_WAITING, {
+            "order_id": order_id,
+            "status": "pending",
+            "details": updated_order
+        })
+        
+        # 2. Notify customer about the status change
+        if order_id in order_customers:
+            customer_id = order_customers[order_id]
+            
+            # Emit customer update with the updated order details
+            socketio.emit(WS_PICKER_UPDATE, {
+                "order_id": order_id,
+                "customer_id": customer_id,
+                "status": "pending",  # Make sure this matches the new status
+                "details": updated_order
+            })
+            
+            print(f"Notified customer {customer_id} that order {order_id} is now pending again")
+        
+        print(f"Order {order_id} assignment cancelled by picker {picker_id}, returned to pending status")
+        
+        return jsonify({
+            "status": "success", 
+            "message": "Order assignment cancelled",
+            "order": updated_order
+        }), 200
+        
+    except Exception as e:
+        print(f"Error in cancel_order_assignment: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# Test route
+@app.route('/test', methods=['GET'])
+def test_route():
+    return jsonify({"status": "success", "message": "Composite service is running"})
 
 # MAIN
 if __name__ == "__main__":
     print("Starting Assign Picker service...")
-    socketio.run(app, host="0.0.0.0", port=5005, debug=True)
+    socketio.run(app, debug=True, host="0.0.0.0", port=5005)

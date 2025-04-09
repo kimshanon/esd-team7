@@ -1,0 +1,29 @@
+FROM python:3.12-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first to leverage Docker cache
+COPY composite_requirements.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r composite_requirements.txt
+RUN pip install eventlet
+
+# Copy application code
+COPY ./composite/assign_picker_v2.py /app/composite/
+COPY ./composite/__init__.py /app/composite/
+COPY .env.docker /app/.env
+COPY firebase-adminsdk.json /app/firebase-adminsdk.json
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV FLASK_APP=/app/composite/assign_picker_v2.py
+ENV FLASK_RUN_HOST=0.0.0.0
+ENV PYTHONUNBUFFERED=1
+
+# Expose the port that the service runs on
+EXPOSE 5005
+
+# Run the service
+CMD ["python", "/app/composite/assign_picker_v2.py"]

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -7,6 +7,7 @@ import {
   Clock,
   CheckCircle2,
   Calendar,
+  User,
 } from "lucide-react";
 import axios from "axios";
 import { format } from "date-fns";
@@ -23,10 +24,13 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAppSelector } from "@/redux/hooks";
+
+import websocketService, { WS_EVENTS } from "@/services/websocketService";
 
 const orderStatusSteps = [
   { key: "pending", label: "Order Received", icon: Package },
-  { key: "assigned", label: "Assigned to Picker", icon: Package },
+  { key: "assigned", label: "Assigned to Picker", icon: User },
   { key: "preparing", label: "Preparing", icon: Package },
   { key: "delivering", label: "Out for Delivery", icon: Package },
   { key: "completed", label: "Delivered", icon: CheckCircle2 },
@@ -95,29 +99,107 @@ export default function OrderTrackingPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAppSelector((state) => state.auth);
+  const [pickerInfo, setPickerInfo] = useState<{ picker_name?: string } | null>(
+    null
+  );
 
-  useEffect(() => {
-    async function fetchOrderDetails() {
-      try {
-        setLoading(true);
-        const response = await axios.get(
-          `http://127.0.0.1:5003/orders/${orderId}`
-        );
-        setOrder(response.data);
-      } catch (error) {
-        console.error("Error fetching order details:", error);
-        toast.error("Failed to load order details", {
-          description: "Please try again later",
-        });
-      } finally {
-        setLoading(false);
+  // Create a fetchOrderDetails function that can be reused
+  const fetchOrderDetails = useCallback(async () => {
+    if (!orderId) return;
+
+    try {
+      setLoading(true);
+      const response = await axios.get(
+        `http://127.0.0.1:5003/orders/${orderId}`
+      );
+      setOrder(response.data);
+
+      // If order has a picker, fetch picker details
+      if (response.data.picker_id) {
+        try {
+          const pickerResponse = await axios.get(
+            `http://127.0.0.1:5001/pickers/${response.data.picker_id}`
+          );
+          setPickerInfo(pickerResponse.data);
+        } catch (err) {
+          console.error("Couldn't load picker details", err);
+        }
       }
-    }
-
-    if (orderId) {
-      fetchOrderDetails();
+    } catch (error) {
+      console.error("Error fetching order details:", error);
+      toast.error("Failed to load order details", {
+        description: "Please try again later",
+      });
+    } finally {
+      setLoading(false);
     }
   }, [orderId]);
+
+  useEffect(() => {
+    fetchOrderDetails();
+
+    // Connect to WebSocket for real-time updates if we have an order ID and user
+    if (orderId && user?.id) {
+      // Connect to WebSocket
+      websocketService.connect();
+
+      // Register to get updates for this specific order
+      websocketService.registerForOrderUpdates(user.id, orderId);
+
+      // Handle when a picker accepts the order
+      const handleOrderTaken = (data: any) => {
+        if (data.order_id === orderId) {
+          console.log("Order taken update received", data);
+          // Refresh order details to get picker info
+          fetchOrderDetails();
+
+          // Show notification
+          toast.success("Your order has been accepted!", {
+            description:
+              "A picker has accepted your order and will prepare it soon.",
+          });
+        }
+      };
+
+      // Listen for status updates
+      const handlePickerUpdate = (data: any) => {
+        console.log("Picker update received", data);
+
+        if (data.order_id === orderId) {
+          // Refresh order details to get the latest status
+          fetchOrderDetails();
+
+          // Special notification for orders returned to pending
+          if (data.status === "pending" && order?.order_status !== "pending") {
+            toast.info("Order returned to pending", {
+              description: "Your order will be assigned to a new picker soon.",
+            });
+          } else {
+            // Regular status update notification
+            const statusStep = orderStatusSteps.find(
+              (step) => step.key === data.status
+            );
+            const statusLabel = statusStep ? statusStep.label : data.status;
+
+            toast.info("Order status updated!", {
+              description: `Your order is now ${statusLabel.toLowerCase()}.`,
+            });
+          }
+        }
+      };
+
+      // Register event handlers
+      websocketService.on(WS_EVENTS.ORDER_TAKEN, handleOrderTaken);
+      websocketService.on(WS_EVENTS.PICKER_UPDATE, handlePickerUpdate);
+
+      // Cleanup
+      return () => {
+        websocketService.off(WS_EVENTS.ORDER_TAKEN, handleOrderTaken);
+        websocketService.off(WS_EVENTS.PICKER_UPDATE, handlePickerUpdate);
+      };
+    }
+  }, [orderId, user?.id, fetchOrderDetails]);
 
   // Calculate total cost
   const calculateTotal = (items: any[]) => {
@@ -277,10 +359,13 @@ export default function OrderTrackingPage() {
               {order.picker_id && (
                 <div>
                   <div className="flex items-center text-sm text-muted-foreground mb-1">
-                    <Package className="h-4 w-4 mr-1" />
+                    <User className="h-4 w-4 mr-1" />
                     Assigned Picker
                   </div>
-                  <p>Picker ID: {order.picker_id}</p>
+                  <p>
+                    {pickerInfo?.picker_name ||
+                      "Picker #" + order.picker_id.substring(0, 6)}
+                  </p>
                 </div>
               )}
 

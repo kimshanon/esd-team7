@@ -34,6 +34,10 @@ export const mapMenuItemToFrontend = (item: MenuItem): MenuItemFrontend => {
   };
 };
 
+interface MenuResponse {
+  StallItem: MenuItem[];
+}
+
 // Fetch all restaurants
 export const fetchAllRestaurants = async (): Promise<Restaurant[]> => {
   try {
@@ -61,10 +65,10 @@ export const fetchRestaurantMenu = async (
   id: string
 ): Promise<MenuItemFrontend[]> => {
   try {
-    const response = await axios.get<MenuItem[]>(
+    const response = await axios.get<MenuResponse>(
       `${API_URL}/stalls/${id}/menu`
     );
-    return response.data.map(mapMenuItemToFrontend);
+    return response.data["StallItem"].map(mapMenuItemToFrontend);
   } catch (error) {
     console.error(`Error fetching menu for restaurant ${id}:`, error);
     throw error;

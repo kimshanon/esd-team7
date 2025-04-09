@@ -14,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import DeliveryLocation from "@/components/DeliveryLocation";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
-
 export default function CartPage() {
   const { cart, removeFromCart, updateQuantity, clearCart } = useCart();
   const [promoCode, setPromoCode] = useState("");
@@ -80,20 +79,22 @@ export default function CartPage() {
       };
 
       // Post to orders endpoint
+      // Instead of posting directly to the orders API, we'll post through
+      // the assignment service to handle the WebSocket broadcasting
       const response = await axios.post(
-        "http://127.0.0.1:5003/orders",
+        "http://127.0.0.1:5005/orders", // This endpoint forwards to the order service and handles WebSocket
         orderData
       );
 
       // Handle successful order
       toast.success("Order placed successfully!", {
-        description: `Order #${response.data.id} has been created.`,
+        description: `Order #${response.data.order_id} has been created.`,
       });
 
       // Clear the cart
       clearCart();
 
-      // Redirect to the orders pagegeneric orders route
+      // Redirect to the orders route
       navigate("/orders");
     } catch (error) {
       console.error("Checkout error:", error);

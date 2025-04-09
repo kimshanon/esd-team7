@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   ShoppingBag,
@@ -23,6 +23,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import websocketService, { WS_EVENTS } from "@/services/websocketService";
 
 // Order status mapping for UI display
 const orderStatusMap = {
@@ -54,6 +55,40 @@ export default function OrdersPage() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const navigate = useNavigate();
 
+  // Add refs to track registered orders and prevent duplicate registrations
+  const registeredOrdersRef = useRef<Set<string>>(new Set());
+  // Track whether event handlers are registered
+  const eventHandlersRegisteredRef = useRef(false);
+
+  // Function to fetch orders - extracted so we can call it after updates
+  const fetchOrders = async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+      const response = await axios.get(
+        `http://127.0.0.1:5003/customers/${user.id}/orders`
+      );
+
+      // Sort orders by date (newest first)
+      const sortedOrders = response.data.sort((a: any, b: any) => {
+        return (
+          new Date(b.order_start).getTime() - new Date(a.order_start).getTime()
+        );
+      });
+
+      setOrders(sortedOrders);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      toast.error("Failed to load orders", {
+        description: "Please try again later",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Connect to WebSocket and setup event handlers - run once
   useEffect(() => {
     // Redirect to login if not authenticated
     if (!isAuthenticated) {
@@ -61,36 +96,99 @@ export default function OrdersPage() {
       return;
     }
 
-    async function fetchOrders() {
-      try {
-        setLoading(true);
-        const response = await axios.get(
-          `http://127.0.0.1:5003/customers/${user?.id}/orders`
-        );
+    if (!user?.id || eventHandlersRegisteredRef.current) return;
 
-        // Sort orders by date (newest first)
-        const sortedOrders = response.data.sort((a: any, b: any) => {
-          return (
-            new Date(b.order_start).getTime() -
-            new Date(a.order_start).getTime()
-          );
-        });
+    // Connect to WebSocket
+    websocketService.connect();
 
-        setOrders(sortedOrders);
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-        toast.error("Failed to load orders", {
-          description: "Please try again later",
+    // Listen for order assignments (when a picker accepts an order)
+    const handleOrderTaken = (data: any) => {
+      console.log("Order taken event received:", data);
+
+      if (data.order_id) {
+        // Refresh the orders list without checking current state
+        fetchOrders();
+
+        // Notify the customer
+        toast.success("Order update!", {
+          description: `Your order #${data.order_id.substring(
+            0,
+            8
+          )} has been accepted by a picker.`,
+          action: {
+            label: "View",
+            onClick: () => navigate(`/orders/${data.order_id}`),
+          },
         });
-      } finally {
-        setLoading(false);
       }
-    }
+    };
 
-    if (user?.id) {
-      fetchOrders();
-    }
+    // Listen for status updates (preparing, delivering, completed)
+    const handlePickerUpdate = (data: any) => {
+      console.log("Picker update event received:", data);
+
+      // Check if this update is for the current customer
+      if (data.customer_id === user.id) {
+        // Refresh the orders list
+        fetchOrders();
+
+        // Get the readable status label
+        const statusLabel =
+          orderStatusMap[data.status as keyof typeof orderStatusMap]?.label ||
+          data.status;
+
+        // Notify the customer
+        toast.info("Order status updated!", {
+          description: `Your order #${data.order_id.substring(
+            0,
+            8
+          )} is now ${statusLabel.toLowerCase()}.`,
+          action: {
+            label: "View",
+            onClick: () => navigate(`/orders/${data.order_id}`),
+          },
+        });
+      }
+    };
+
+    // Register for WebSocket events
+    websocketService.on(WS_EVENTS.ORDER_TAKEN, handleOrderTaken);
+    websocketService.on(WS_EVENTS.PICKER_UPDATE, handlePickerUpdate);
+
+    // Set flag to prevent duplicate registrations
+    eventHandlersRegisteredRef.current = true;
+
+    // Initial data fetch
+    fetchOrders();
+
+    // Cleanup function
+    return () => {
+      websocketService.off(WS_EVENTS.ORDER_TAKEN, handleOrderTaken);
+      websocketService.off(WS_EVENTS.PICKER_UPDATE, handlePickerUpdate);
+      eventHandlersRegisteredRef.current = false;
+    };
   }, [user?.id, isAuthenticated, navigate]);
+
+  // Register new orders for WebSocket updates when orders list changes
+  useEffect(() => {
+    if (!user?.id || orders.length === 0) return;
+
+    // Only register for orders we haven't registered for yet
+    const newOrders = orders.filter(
+      (order) => !registeredOrdersRef.current.has(order.id)
+    );
+
+    if (newOrders.length > 0) {
+      console.log(
+        `Registering ${newOrders.length} new orders for WebSocket updates`
+      );
+
+      newOrders.forEach((order) => {
+        websocketService.registerForOrderUpdates(user.id, order.id);
+        registeredOrdersRef.current.add(order.id);
+      });
+    }
+  }, [orders, user?.id]);
 
   // Calculate total cost of an order
   const calculateTotal = (items: any[]) => {
