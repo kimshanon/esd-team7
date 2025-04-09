@@ -85,6 +85,38 @@ services:
       - "15672:15672"
     networks:
       - esd-network
+  
+  # Add assign_picker composite service
+  assign-picker-service:
+    build:
+      context: .
+      dockerfile: ./composite/Dockerfile.assign_picker
+    ports:
+      - "5005:5005"
+    env_file:
+      - .env.docker
+    depends_on:
+      - rabbitmq
+      - order-service
+      - picker-service
+    networks:
+      - esd-network
+  
+  # Add updatelocation composite service
+  update-location-service:
+    build:
+      context: .
+      dockerfile: ./composite/Dockerfile.update_location
+    ports:
+      - "5006:5006"
+    env_file:
+      - .env.docker
+    volumes:
+      - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
+    depends_on:
+      - rabbitmq
+    networks:
+      - esd-network
 
 networks:
   esd-network:

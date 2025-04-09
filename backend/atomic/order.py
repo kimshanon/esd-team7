@@ -195,6 +195,10 @@ def update_order_status(order_id):
     current_data = order_doc.to_dict()
     current_data['order_status'] = data['order_status']
     
+    # Only update picker_id if it's included in the request
+    if 'picker_id' in data:
+        current_data['picker_id'] = data['picker_id']
+    
     # If status is completed, add completion timestamp
     if data['order_status'] == 'completed':
         current_data['order_completed'] = datetime.now().isoformat()
@@ -211,6 +215,9 @@ def update_order_status(order_id):
         
         # Update only the status field
         update_data = {'order_status': data['order_status']}
+        if 'picker_id' in data:
+            update_data['picker_id'] = data['picker_id']
+            
         if data['order_status'] == 'completed':
             update_data['order_completed'] = current_data['order_completed']
         

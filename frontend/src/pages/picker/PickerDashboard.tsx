@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAppSelector } from "@/redux/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
+import websocketService, { WS_EVENTS } from "@/services/websocketService";
 
 // Helper function to format currency
 const formatCurrency = (amount: number) => {
@@ -124,9 +125,11 @@ const AvailableOrderCard = ({
 const ActiveOrderView = ({
   order,
   onUpdateStatus,
+  onCancelOrder,
 }: {
   order: any;
   onUpdateStatus: (status: string) => void;
+  onCancelOrder: () => void;
 }) => {
   if (!order) {
     return (
@@ -275,11 +278,22 @@ const ActiveOrderView = ({
             </div>
           </div>
         </CardContent>
-        <CardFooter>
+        <CardFooter className="flex flex-col sm:flex-row gap-2">
+          {/* Show Cancel button only when in "assigned" status */}
+          {order.order_status === "assigned" && (
+            <Button
+              variant="destructive"
+              className="w-full sm:w-auto order-2 sm:order-1"
+              onClick={onCancelOrder}
+            >
+              Cancel Assignment
+            </Button>
+          )}
+
           {/* Only show the update button if we have a next status */}
           {steps[currentStep].nextStatus && (
             <Button
-              className="w-full"
+              className="w-full sm:flex-1 order-1 sm:order-2"
               onClick={() => onUpdateStatus(steps[currentStep].nextStatus!)}
             >
               Mark as {steps[currentStep + 1].label}
@@ -341,6 +355,7 @@ const CompletedOrderCard = ({ order }: { order: any }) => {
   );
 };
 
+// In the main PickerDashboard component, add the cancel handler
 export default function PickerDashboard() {
   const navigate = useNavigate();
   const { user } = useAppSelector((state) => state.auth);
@@ -392,10 +407,110 @@ export default function PickerDashboard() {
     };
 
     fetchData();
-    // Set up a periodic refresh (every 30 seconds)
-    const intervalId = setInterval(fetchData, 30000);
 
-    return () => clearInterval(intervalId);
+    // Connect to WebSocket service
+    websocketService.connect();
+
+    // Register as picker to receive order notifications
+    if (user?.id) {
+      websocketService.registerAsPicker(user.id);
+    }
+
+    // Listen for new available orders
+    const handleNewOrder = (orderData: any) => {
+      console.log("New order received:", orderData);
+
+      // Check if this order is already in our list - use a function that doesn't depend on state
+      setAvailableOrders((prev) => {
+        // Only add if not already in the list
+        if (!prev.some((order) => order.id === orderData.order_id)) {
+          // Show a notification
+          toast.info("New order available!", {
+            description: `Order #${orderData.order_id.substring(
+              0,
+              8
+            )} is waiting for pickup`,
+            action: {
+              label: "View",
+              onClick: () => setActiveTab("available"),
+            },
+          });
+
+          // Validate that the order has all required fields before adding to the list
+          const orderToAdd = orderData.details || {};
+
+          // Make sure the order has order_items array to prevent the reduce error
+          if (!orderToAdd.order_items) {
+            console.warn(
+              "Order is missing order_items array, fetching complete order details"
+            );
+
+            // If order_items is missing, fetch the complete order data
+            axios
+              .get(`http://127.0.0.1:5003/orders/${orderData.order_id}`)
+              .then((response) => {
+                setAvailableOrders((prevOrders) => [
+                  response.data,
+                  ...prevOrders,
+                ]);
+              })
+              .catch((error) => {
+                console.error("Error fetching complete order:", error);
+              });
+
+            // Return unchanged for now, the axios call will update state when it completes
+            return prev;
+          }
+
+          // Only add if the order has order_items property
+          return [orderToAdd, ...prev];
+        }
+        return prev;
+      });
+    };
+
+    // Listen for orders that have been taken by other pickers
+    const handleOrderTaken = (data: any) => {
+      console.log("Order taken:", data);
+
+      // Remove the taken order from available orders
+      setAvailableOrders((prev) =>
+        prev.filter((order) => order.id !== data.order_id)
+      );
+
+      // If this picker took the order, update the active order
+      if (data.picker_id === user?.id) {
+        // Fetch the updated order details
+        axios
+          .get(`http://127.0.0.1:5003/orders/${data.order_id}`)
+          .then((response) => {
+            setActiveOrder(response.data);
+            setActiveTab("active");
+          })
+          .catch((err) => console.error("Error fetching accepted order:", err));
+      } else {
+        // If another picker took it, just notify
+        toast.info(
+          `Order #${data.order_id.substring(
+            0,
+            8
+          )} was accepted by another picker`
+        );
+      }
+    };
+
+    // Register event handlers
+    websocketService.on(WS_EVENTS.ORDER_WAITING, handleNewOrder);
+    websocketService.on(WS_EVENTS.ORDER_TAKEN, handleOrderTaken);
+
+    // Test WebSocket connection
+    websocketService.testConnection();
+
+    // Cleanup
+    return () => {
+      websocketService.off(WS_EVENTS.ORDER_WAITING, handleNewOrder);
+      websocketService.off(WS_EVENTS.ORDER_TAKEN, handleOrderTaken);
+    };
   }, [user, navigate]);
 
   const handleAcceptOrder = async (orderId: string) => {
@@ -407,9 +522,9 @@ export default function PickerDashboard() {
       }
 
       // Update the order in the backend
-      await axios.put(`http://127.0.0.1:5003/orders/${orderId}`, {
+      await axios.post("http://127.0.0.1:5005/picker_accept", {
+        order_id: orderId,
         picker_id: user?.id,
-        order_status: "assigned",
       });
 
       // Fetch the updated order
@@ -425,7 +540,6 @@ export default function PickerDashboard() {
 
       // Switch to active order tab
       setActiveTab("active");
-
       toast.success("Order accepted successfully!");
     } catch (error) {
       console.error("Error accepting order:", error);
@@ -437,13 +551,11 @@ export default function PickerDashboard() {
     if (!activeOrder) return;
 
     try {
-      // Update order status in the backend
-      await axios.patch(
-        `http://127.0.0.1:5003/orders/${activeOrder.id}/status`,
-        {
-          order_status: newStatus,
-        }
-      );
+      // Update order status via the composite service instead of directly
+      await axios.post("http://127.0.0.1:5005/order_status", {
+        order_id: activeOrder.id,
+        status: newStatus,
+      });
 
       // Fetch the updated order
       const response = await axios.get(
@@ -466,7 +578,47 @@ export default function PickerDashboard() {
     }
   };
 
-  // Calculate total earnings from completed orders
+  // Add a new function to handle cancellation
+  const handleCancelOrder = async () => {
+    if (!activeOrder) return;
+
+    try {
+      // Call the API to update the order status back to "pending" and remove picker assignment
+      const response = await axios.post("http://127.0.0.1:5005/order_cancel", {
+        order_id: activeOrder.id,
+        picker_id: user?.id,
+      });
+
+      toast.success("Order assignment cancelled", {
+        description: "The order is now available for other pickers",
+      });
+
+      // Set the active order to null
+      setActiveOrder(null);
+
+      // Refresh available orders after a short delay to allow the backend to update
+      setTimeout(() => {
+        axios
+          .get("http://127.0.0.1:5003/orders")
+          .then((response) => {
+            const pendingOrders = response.data.filter(
+              (order: any) =>
+                order.order_status === "pending" && !order.picker_id
+            );
+            setAvailableOrders(pendingOrders);
+            // Switch to available tab
+            setActiveTab("available");
+          })
+          .catch((error) =>
+            console.error("Error refreshing available orders:", error)
+          );
+      }, 1000);
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+      toast.error("Failed to cancel order assignment");
+    }
+  };
+
   const calculateTotalEarnings = () => {
     return completedOrders.reduce((total, order) => {
       const orderTotal = order.order_items.reduce(
@@ -499,7 +651,6 @@ export default function PickerDashboard() {
             Manage your deliveries and track earnings
           </p>
         </div>
-
         <div className="mt-4 md:mt-0 p-4 bg-muted/30 rounded-lg">
           <h2 className="text-sm font-medium text-muted-foreground">
             Total Earnings
@@ -559,6 +710,7 @@ export default function PickerDashboard() {
           <ActiveOrderView
             order={activeOrder}
             onUpdateStatus={handleUpdateOrderStatus}
+            onCancelOrder={handleCancelOrder}
           />
         </TabsContent>
 

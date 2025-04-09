@@ -92,6 +92,7 @@ export const fetchRestaurantMenu = async (
       `https://personal-dcwqxa6n.outsystemscloud.com/SMUlivery/rest/FoodStallAPI/GetAllFoodFromStall/${id}`
     );
     return response.data.StallItems.map(mapMenuItemToFrontend);
+
   } catch (error) {
     console.error(`Error fetching menu for restaurant ${id}:`, error);
     throw error;
