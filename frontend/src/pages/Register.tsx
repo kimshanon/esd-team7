@@ -84,6 +84,7 @@ export default function RegisterPage() {
           picker_phone: parseInt(formData.phone) || 0, // Convert to integer as required by model
           is_available: true, // Default availability
           firebase_uid: firebaseUser.uid,
+          picker_credits: 0
         };
       }
 

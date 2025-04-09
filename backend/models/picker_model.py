@@ -7,6 +7,7 @@ class PickerModel(BaseModel):
     picker_email: EmailStr
     picker_phone: int
     is_available: bool = Field(default=True)
+    picker_credits: float
     
     # Optional fields you might want to add later
     # location: Optional[str] = None

@@ -86,7 +86,7 @@ services:
     networks:
       - esd-net
   
-  # Add assign_picker composite service
+  # Add order_service composite service
   assign-picker-service:
     build:
       context: .
@@ -120,4 +120,5 @@ services:
 
 networks:
   esd-net:
-    external: true
+    driver: bridge
+    # external: true

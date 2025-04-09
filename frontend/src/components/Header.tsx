@@ -36,6 +36,7 @@ export default function Header() {
     { href: "/", label: "Home" },
     { href: "/special", label: "Deals" },
     { href: "/orders", label: "My Orders" },
+    { href: "/orders/completed", label: "Completed Order" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
