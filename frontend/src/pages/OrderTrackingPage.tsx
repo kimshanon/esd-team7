@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Package,
@@ -9,6 +9,8 @@ import {
   Calendar,
   User,
   Edit,
+  Store,
+  Navigation,
 } from "lucide-react";
 import axios from "axios";
 import { format } from "date-fns";
@@ -29,6 +31,8 @@ import { useAppSelector } from "@/redux/hooks";
 
 import websocketService, { WS_EVENTS } from "@/services/websocketService";
 import ChangeLocationModal from "@/components/ChangeLocationModal"
+import { fetchOrderById, fetchRouteInfo } from "@/services/api";
+import RouteMap from "@/components/RouteMap";
 
 const orderStatusSteps = [
   { key: "pending", label: "Order Received", icon: Package },
@@ -87,13 +91,21 @@ function OrderStatusTimeline({ currentStatus }: { currentStatus: string }) {
 
 export default function OrderTrackingPage() {
   const { orderId } = useParams<{ orderId: string }>();
+  const navigate = useNavigate();
+  const { user } = useAppSelector((state) => state.auth);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const { user } = useAppSelector((state) => state.auth);
   const [pickerInfo, setPickerInfo] = useState<{ picker_name?: string } | null>(
     null
   );
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [routeInfo, setRouteInfo] = useState<{
+    distance: number;
+    duration: number;
+    polyline: string;
+  } | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [newLocation, setNewLocation] = useState("");
 
   // Create a fetchOrderDetails function that can be reused
   const fetchOrderDetails = useCallback(async () => {
@@ -101,16 +113,14 @@ export default function OrderTrackingPage() {
 
     try {
       setLoading(true);
-      const response = await axios.get(
-        `http://127.0.0.1:5003/orders/${orderId}`
-      );
-      setOrder(response.data);
+      const order = await fetchOrderById(orderId);
+      setOrder(order);
 
       // If order has a picker, fetch picker details
-      if (response.data.picker_id) {
+      if (order.picker_id) {
         try {
           const pickerResponse = await axios.get(
-            `http://127.0.0.1:5001/pickers/${response.data.picker_id}`
+            `http://127.0.0.1:5001/pickers/${order.picker_id}`
           );
           setPickerInfo(pickerResponse.data);
         } catch (err) {
@@ -126,6 +136,21 @@ export default function OrderTrackingPage() {
       setLoading(false);
     }
   }, [orderId]);
+
+  // Add new function to fetch route information
+  const fetchRouteDetails = useCallback(async () => {
+    if (!order?.stall_location || !order?.order_location) return;
+
+    try {
+      const route = await fetchRouteInfo(order.stall_location, order.order_location);
+      setRouteInfo(route);
+    } catch (error) {
+      console.error("Error fetching route information:", error);
+      toast.error("Failed to load route information", {
+        description: "Please try again later",
+      });
+    }
+  }, [order?.stall_location, order?.order_location]);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -192,6 +217,24 @@ export default function OrderTrackingPage() {
     }
   }, [orderId, user?.id, fetchOrderDetails]);
 
+  // Update useEffect to fetch route information when order changes
+  useEffect(() => {
+    if (order && user?.role === "picker") {
+      const fetchRoute = async () => {
+        try {
+          const route = await fetchRouteInfo(
+            order.stall_location,
+            order.order_location
+          );
+          setRouteInfo(route);
+        } catch (error) {
+          console.error("Error fetching route:", error);
+        }
+      };
+      fetchRoute();
+    }
+  }, [order, user?.role]);
+
   // Calculate total cost
   const calculateTotal = (items: any[]) => {
     return items.reduce((sum, item) => sum + item.order_price * item.order_quantity, 0)
@@ -220,6 +263,24 @@ export default function OrderTrackingPage() {
       toast.success("Delivery location updated successfully")
     }
   }
+
+  // Add helper function to format distance and duration
+  const formatDistance = (meters: number) => {
+    if (meters < 1000) {
+      return `${Math.round(meters)}m`;
+    }
+    return `${(meters / 1000).toFixed(1)}km`;
+  };
+
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.ceil(seconds / 60);
+    if (minutes < 60) {
+      return `${minutes} min`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}min`;
+  };
 
   if (loading) {
     return (
@@ -341,11 +402,47 @@ export default function OrderTrackingPage() {
             <CardContent className="space-y-4">
               <div>
                 <div className="flex items-center text-sm text-muted-foreground mb-1">
+                  <Store className="h-4 w-4 mr-1" />
+                  Pickup Location
+                </div>
+                <p className="text-sm font-medium">{order.stall_name}</p>
+                <p className="text-sm">{order.stall_location}</p>
+              </div>
+
+              <Separator />
+
+              <div>
+                <div className="flex items-center text-sm text-muted-foreground mb-1">
                   <MapPin className="h-4 w-4 mr-1" />
                   Delivery Address
                 </div>
                 <p>{order.order_location}</p>
               </div>
+
+              {/* Only show route information for pickers */}
+              {user?.role === "picker" && routeInfo && (
+                <div>
+                  <div className="flex items-center text-sm text-muted-foreground mb-1">
+                    <Navigation className="h-4 w-4 mr-1" />
+                    Route Information
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <div>
+                      <p className="text-sm font-medium">Distance</p>
+                      <p className="text-sm">{formatDistance(routeInfo.distance)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Estimated Time</p>
+                      <p className="text-sm">{formatDuration(routeInfo.duration)}</p>
+                    </div>
+                  </div>
+                  <RouteMap
+                    startLocation={order.stall_location}
+                    endLocation={order.order_location}
+                    polyline={routeInfo.polyline}
+                  />
+                </div>
+              )}
 
               {order.picker_id && (
                 <div>
@@ -387,6 +484,37 @@ export default function OrderTrackingPage() {
         orderId={orderId || ""}
         onLocationUpdated={handleLocationUpdated}
       />
+
+      {/* Only show route information for pickers */}
+      {user?.role === "picker" && routeInfo && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Delivery Route</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Distance</p>
+                  <p className="text-sm text-muted-foreground">
+                    {(routeInfo.distance / 1000).toFixed(1)} km
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Estimated Time</p>
+                  <p className="text-sm text-muted-foreground">
+                    {Math.ceil(routeInfo.duration / 60)} minutes
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

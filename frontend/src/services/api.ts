@@ -45,6 +45,13 @@ interface MenuResponse {
   StallItems: MenuItem[];
 }
 
+// Add new interface for route response
+interface RouteResponse {
+  distance: number; // in meters
+  duration: number; // in seconds
+  polyline: string;
+}
+
 // Fetch all restaurants
 export const fetchAllRestaurants = async (): Promise<Restaurant[]> => {
   try {
@@ -126,8 +133,24 @@ export const fetchCustomerOrders = async (customerId: string) => {
 // Fetch a specific order by ID
 export const fetchOrderById = async (orderId: string) => {
   try {
-    const response = await axios.get(`${ORDER_API_URL}/orders/${orderId}`);
-    return response.data;
+    // Fetch order details
+    const orderResponse = await axios.get(`${ORDER_API_URL}/orders/${orderId}`);
+    const order = orderResponse.data;
+
+    // Fetch stall details
+    const stallResponse = await axios.get<StallResponse>(
+      `https://personal-dcwqxa6n.outsystemscloud.com/SMUlivery/rest/FoodStallAPI/GetAllStalls`
+    );
+    const stall = stallResponse.data.FoodStalls.find(
+      (s) => s.stall_id.toString() === order.stall_id
+    );
+
+    // Combine order data with stall information
+    return {
+      ...order,
+      stall_name: stall?.stall_name || "Unknown Stall",
+      stall_location: stall?.stall_location || "Unknown Location",
+    };
   } catch (error) {
     console.error(`Error fetching order ${orderId}:`, error);
     throw error;
@@ -137,10 +160,32 @@ export const fetchOrderById = async (orderId: string) => {
 // Fetch orders for a picker
 export const fetchPickerOrders = async (pickerId: string) => {
   try {
+    // First fetch all orders for the picker
     const response = await axios.get(
       `${ORDER_API_URL}/pickers/${pickerId}/orders`
     );
-    return response.data;
+    
+    // Then fetch all stalls
+    const stallsResponse = await axios.get(
+      "https://personal-dcwqxa6n.outsystemscloud.com/SMUlivery/rest/FoodStallAPI/GetAllStalls"
+    );
+    
+    // Create a map of stall IDs to stall details
+    const stallsMap = new Map(
+      stallsResponse.data.FoodStalls.map((stall: any) => [stall.stall_id.toString(), stall])
+    );
+    
+    // Combine order data with stall information
+    const ordersWithStallInfo = response.data.map((order: any) => {
+      const stall = stallsMap.get(order.stall_id.toString());
+      return {
+        ...order,
+        stall_name: stall?.stall_name || "Unknown Stall",
+        stall_location: stall?.stall_location || "Unknown Location"
+      };
+    });
+    
+    return ordersWithStallInfo;
   } catch (error) {
     console.error(`Error fetching orders for picker ${pickerId}:`, error);
     throw error;
@@ -192,6 +237,22 @@ export const fetchFoodListingById = async (id: number): Promise<FoodListing> => 
     return response.data.FoodListing;
   } catch (error) {
     console.error(`Error fetching food listing with ID ${id}:`, error);
+    throw error;
+  }
+};
+
+// Fetch route information between two locations
+export const fetchRouteInfo = async (startLocation: string, endLocation: string): Promise<RouteResponse> => {
+  try {
+    const response = await axios.get(`${API_URL}/routes`, {
+      params: {
+        start: startLocation,
+        end: endLocation
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching route information:", error);
     throw error;
   }
 };

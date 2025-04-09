@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import axios from "axios";
 import { format } from "date-fns";
-import { Bike, Clock, MapPin, Package, DollarSign } from "lucide-react";
+import { Bike, Clock, MapPin, Package, DollarSign, Store } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -19,6 +19,8 @@ import { Separator } from "@/components/ui/separator";
 import { useAppSelector } from "@/redux/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import websocketService, { WS_EVENTS } from "@/services/websocketService";
+import { fetchPickerOrders } from "@/services/api";
+import RouteMap from "@/components/RouteMap";
 
 // Helper function to format currency
 const formatCurrency = (amount: number) => {
@@ -70,6 +72,19 @@ const AvailableOrderCard = ({
       </CardHeader>
       <CardContent className="pb-2">
         <div className="space-y-4">
+          <div className="flex items-start gap-2">
+            <Store className="h-4 w-4 text-muted-foreground mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">Pickup Location</p>
+              <p className="text-sm text-muted-foreground">
+                {order.stall_name}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {order.stall_location}
+              </p>
+            </div>
+          </div>
+
           <div className="flex items-start gap-2">
             <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
             <div>
@@ -244,12 +259,31 @@ const ActiveOrderView = ({
 
           <div className="grid gap-4">
             <div className="flex items-start gap-2">
+              <Store className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">Pickup Location</p>
+                <p className="text-sm font-medium">{order.stall_name}</p>
+                <p className="text-sm">{order.stall_location}</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-start gap-2">
               <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
               <div>
                 <p className="text-sm font-medium">Delivery Location</p>
                 <p className="text-sm">{order.order_location}</p>
               </div>
             </div>
+
+            <Separator />
+
+            {/* Add the route map */}
+            <RouteMap
+              startLocation={order.stall_location}
+              endLocation={order.order_location}
+            />
 
             <Separator />
 
@@ -379,21 +413,46 @@ export default function PickerDashboard() {
         const pendingOrders = pendingResponse.data.filter(
           (order: any) => order.order_status === "pending" && !order.picker_id
         );
-        setAvailableOrders(pendingOrders);
 
-        // 2. Fetch active order (orders assigned to this picker that are not completed/cancelled)
-        const pickerOrdersResponse = await axios.get(
-          `http://127.0.0.1:5003/pickers/${user.id}/orders`
+        // Fetch stall information for each pending order
+        const ordersWithStallInfo = await Promise.all(
+          pendingOrders.map(async (order: any) => {
+            try {
+              const stallResponse = await axios.get(
+                `https://personal-dcwqxa6n.outsystemscloud.com/SMUlivery/rest/FoodStallAPI/GetAllStalls`
+              );
+              // console.log('Order:', { id: order.id, stall_id: order.stall_id, type: typeof order.stall_id });
+              // console.log('Raw API Response:', JSON.stringify(stallResponse.data, null, 2));
+              // console.log('FoodStalls array:', JSON.stringify(stallResponse.data.FoodStalls, null, 2));
+              // Find the stall in the response that matches our stall_id
+              const stall = stallResponse.data.FoodStalls.find((s: any) => {
+                return Number(s.stall_id) === Number(order.stall_id);
+              });
+              if (!stall) throw new Error(`Stall ${order.stall_id} not found`);
+              return {
+                ...order,
+                stall_name: stall.stall_name,
+                stall_location: stall.stall_location,
+              };
+            } catch (error) {
+              console.error(`Error fetching stall info for order ${order.id}:`, error);
+              return order;
+            }
+          })
         );
-        const pickerOrders = pickerOrdersResponse.data;
 
+        setAvailableOrders(ordersWithStallInfo);
+
+        // 2. Fetch active and completed orders using fetchPickerOrders
+        const pickerOrders = await fetchPickerOrders(user.id);
+        
         const activeOrders = pickerOrders.filter((order: any) =>
           ["assigned", "preparing", "delivering"].includes(order.order_status)
         );
 
         setActiveOrder(activeOrders.length > 0 ? activeOrders[0] : null);
 
-        // 3. Fetch completed orders
+        // 3. Filter completed orders
         const completedOrders = pickerOrders.filter((order: any) =>
           ["completed", "cancelled"].includes(order.order_status)
         );
@@ -448,11 +507,36 @@ export default function PickerDashboard() {
             // If order_items is missing, fetch the complete order data
             axios
               .get(`http://127.0.0.1:5003/orders/${orderData.order_id}`)
-              .then((response) => {
-                setAvailableOrders((prevOrders) => [
-                  response.data,
-                  ...prevOrders,
-                ]);
+              .then(async (response) => {
+                // Fetch stall information
+                const order = response.data;
+                try {
+                  const stallResponse = await axios.get(
+                    `https://personal-dcwqxa6n.outsystemscloud.com/SMUlivery/rest/FoodStallAPI/GetAllStalls`
+                  );
+                  console.log('Order stall_id:', order.stall_id);
+                  console.log('Available stalls:', stallResponse.data.FoodStalls.map((s: any) => ({ id: s.stall_id, name: s.stall_name })));
+                  // Find the stall in the response that matches our stall_id
+                  const stall = stallResponse.data.FoodStalls.find(
+                    (s: any) => Number(s.id) === Number(order.stall_id)
+                  );
+                  if (!stall) throw new Error(`Stall ${order.stall_id} not found`);
+                  const orderWithStall = {
+                    ...order,
+                    stall_name: stall.stall_name,
+                    stall_location: stall.stall_location,
+                  };
+                  setAvailableOrders((prevOrders) => [
+                    orderWithStall,
+                    ...prevOrders,
+                  ]);
+                } catch (error) {
+                  console.error(`Error fetching stall info for new order ${order.id}:`, error);
+                  setAvailableOrders((prevOrders) => [
+                    order,
+                    ...prevOrders,
+                  ]);
+                }
               })
               .catch((error) => {
                 console.error("Error fetching complete order:", error);
